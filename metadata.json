@@ -1,0 +1,6 @@
+{
+  "name": "VisionONE Access Voice AI",
+  "description": "Voice AI Assistant widget for VisionONE Access, featuring interactive voice orb, speech recognition, spoken responses, and ERP business intelligence.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

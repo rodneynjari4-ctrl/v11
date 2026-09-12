@@ -1,0 +1,364 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { VoiceState, ChatMessage, VoiceSettings, LeadFormData } from './types';
+import { AssistantPanel } from './components/AssistantPanel';
+import { LeadModal } from './components/LeadModal';
+import {
+  SpeechRecognitionManager,
+  SpeechSynthesisManager,
+} from './lib/speech';
+
+const INITIAL_WELCOME_MESSAGE: ChatMessage = {
+  id: 'welcome-msg',
+  role: 'assistant',
+  text: "Hi, I'm the VisionONE Access AI Assistant. I can help you explore our ERP, finance, HR and payroll, inventory, eTIMS compliance, and M-Pesa integrations.\n\nWhat would you like to explore today?",
+  voiceText: "Hi, I'm the VisionONE Access AI Assistant. What business area would you like to explore today?",
+  timestamp: Date.now(),
+  suggestedQuestions: [
+    'What modules are in VisionONE ERP?',
+    'How does HR & Payroll work?',
+    'Explain eTIMS tax compliance',
+    'How does M-Pesa integration work?',
+    'Can I book a demo?',
+  ],
+};
+
+export default function App() {
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_WELCOME_MESSAGE]);
+  const [micAmplitude, setMicAmplitude] = useState<number>(0);
+  const [isTextInputOpen, setIsTextInputOpen] = useState(false);
+  const [activePlayingText, setActivePlayingText] = useState<string | null>(null);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
+    INITIAL_WELCOME_MESSAGE.suggestedQuestions || []
+  );
+
+  // Lead qualification & capture modal
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+  const [leadModalType, setLeadModalType] = useState<'demo' | 'quote' | 'contact'>('demo');
+
+  // Warm male voice settings
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
+    isMuted: false,
+    rate: 1.0,
+    pitch: 0.94, // Warm resonant baritone male pitch
+    continuousMode: false,
+  });
+
+  // Speech and Audio Managers
+  const speechRecognitionRef = useRef<SpeechRecognitionManager | null>(null);
+  const speechSynthesisRef = useRef<SpeechSynthesisManager | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+
+  // Initialize Speech Managers on mount
+  useEffect(() => {
+    speechRecognitionRef.current = new SpeechRecognitionManager();
+    speechSynthesisRef.current = new SpeechSynthesisManager();
+
+    return () => {
+      speechRecognitionRef.current?.stop();
+      speechSynthesisRef.current?.stop();
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+    };
+  }, []);
+
+  // Monitor Mic Amplitude loop when listening or speaking
+  useEffect(() => {
+    if (voiceState === 'listening') {
+      const updateAmp = () => {
+        if (speechRecognitionRef.current) {
+          const amp = speechRecognitionRef.current.getMicAmplitude();
+          setMicAmplitude(amp);
+        }
+        animFrameRef.current = requestAnimationFrame(updateAmp);
+      };
+      animFrameRef.current = requestAnimationFrame(updateAmp);
+    } else if (voiceState === 'speaking') {
+      // Audio reactive amplitude oscillation
+      let t = 0;
+      const updateSpeakingAmp = () => {
+        t += 0.16;
+        const fakeAmp = Math.abs(Math.sin(t) * 0.5 + Math.cos(t * 1.8) * 0.3) * 0.8;
+        setMicAmplitude(fakeAmp);
+        animFrameRef.current = requestAnimationFrame(updateSpeakingAmp);
+      };
+      animFrameRef.current = requestAnimationFrame(updateSpeakingAmp);
+    } else {
+      setMicAmplitude(0);
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+    }
+
+    return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+    };
+  }, [voiceState]);
+
+  // Consistent Warm Male Voice Synthesizer
+  const speakVoice = useCallback(
+    async (text: string) => {
+      if (voiceSettings.isMuted || !text) {
+        setVoiceState('idle');
+        setActivePlayingText(null);
+        return;
+      }
+
+      setVoiceState('speaking');
+      setActivePlayingText(text);
+
+      if (speechSynthesisRef.current) {
+        speechSynthesisRef.current.speakText(text, {
+          rate: voiceSettings.rate,
+          pitch: voiceSettings.pitch,
+          onStart: () => {
+            setVoiceState('speaking');
+          },
+          onEnd: () => {
+            setVoiceState('idle');
+            setActivePlayingText(null);
+          },
+          onError: () => {
+            setVoiceState('idle');
+            setActivePlayingText(null);
+          },
+        });
+      } else {
+        setVoiceState('idle');
+        setActivePlayingText(null);
+      }
+    },
+    [voiceSettings]
+  );
+
+  // Send message to server-side AI
+  const processUserMessage = async (userText: string) => {
+    const trimmed = userText.trim();
+    if (!trimmed) return;
+
+    // Immediately stop any active voice speech for instant response
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.stop();
+    }
+
+    const newUserMsg: ChatMessage = {
+      id: 'msg-' + Date.now(),
+      role: 'user',
+      text: trimmed,
+      timestamp: Date.now(),
+    };
+
+    const updatedMessages = [...messages, newUserMsg];
+    setMessages(updatedMessages);
+    setVoiceState('thinking');
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: trimmed,
+          history: updatedMessages.slice(-6).map((m) => ({ role: m.role, text: m.text })),
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('API returned an error');
+      }
+
+      const data = await res.json();
+
+      const aiMsg: ChatMessage = {
+        id: 'msg-' + (Date.now() + 1),
+        role: 'assistant',
+        text: data.text,
+        voiceText: data.voiceText,
+        timestamp: Date.now(),
+        intent: data.intent,
+        cta: data.cta,
+        suggestedQuestions: data.suggestedQuestions,
+      };
+
+      setMessages((prev) => [...prev, aiMsg]);
+      if (data.suggestedQuestions && data.suggestedQuestions.length > 0) {
+        setSuggestedQuestions(data.suggestedQuestions);
+      }
+
+      // Play in consistent warm male voice
+      const spoken = data.voiceText || data.text;
+      speakVoice(spoken);
+    } catch (err) {
+      console.error('Failed to communicate with VisionONE AI:', err);
+      setVoiceState('error');
+      const fallbackMsg: ChatMessage = {
+        id: 'msg-err-' + Date.now(),
+        role: 'assistant',
+        text: "VisionONE Access unifies ERP, Finance, HR & Payroll, and operations. Tap below to explore a live walkthrough.",
+        voiceText: "I'm ready to help you explore VisionONE. Tap below to book a live walkthrough.",
+        timestamp: Date.now(),
+        cta: {
+          type: 'demo',
+          label: 'Book a Demo',
+          description: 'Speak directly with our enterprise solutions team',
+        },
+      };
+      setMessages((prev) => [...prev, fallbackMsg]);
+    }
+  };
+
+  // Start microphone speech recognition
+  const startListening = async () => {
+    // Interruption logic: halt current voice playback immediately
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.stop();
+    }
+
+    if (!speechRecognitionRef.current) {
+      setVoiceState('error');
+      return;
+    }
+
+    const hasPerm = await speechRecognitionRef.current.requestMicrophonePermission();
+    if (!hasPerm) {
+      setVoiceState('error');
+      const errorMsg: ChatMessage = {
+        id: 'mic-denied-' + Date.now(),
+        role: 'assistant',
+        text: 'Microphone access is currently unavailable. You can chat with me using text below.',
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      setIsTextInputOpen(true);
+      return;
+    }
+
+    setVoiceState('listening');
+
+    speechRecognitionRef.current.start(
+      (text: string, isFinal: boolean) => {
+        if (isFinal && text.trim()) {
+          speechRecognitionRef.current?.stop();
+          processUserMessage(text);
+        }
+      },
+      (error: string) => {
+        console.warn('Recognition notice:', error);
+        if (voiceState === 'listening') {
+          setVoiceState('idle');
+        }
+      },
+      () => {
+        setVoiceState('listening');
+      },
+      () => {
+        if (voiceState === 'listening') {
+          setVoiceState('idle');
+        }
+      }
+    );
+  };
+
+  const stopListening = () => {
+    speechRecognitionRef.current?.stop();
+    setVoiceState('idle');
+  };
+
+  const toggleMic = () => {
+    if (voiceState === 'listening') {
+      stopListening();
+    } else if (voiceState === 'speaking') {
+      speechSynthesisRef.current?.stop();
+      startListening();
+    } else {
+      startListening();
+    }
+  };
+
+  const handleLeadSubmit = async (leadData: LeadFormData): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leadData),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const confirmMsg: ChatMessage = {
+          id: 'lead-confirm-' + Date.now(),
+          role: 'assistant',
+          text: `Thank you, ${leadData.name}! Your request has been forwarded to our enterprise team. A VisionONE senior business consultant will reach out shortly via ${leadData.email || leadData.phone}.`,
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, confirmMsg]);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-[#0E152E] text-[#111A3A] relative flex items-center justify-center p-0 sm:p-4 overflow-hidden">
+      {/* Deep Navy Atmosphere Background */}
+      <div className="absolute inset-0 bg-radial from-[#15234D]/90 via-[#0E152E] to-[#0A0F22] pointer-events-none" />
+
+      {/* Ambient Grid Accent */}
+      <div
+        className="absolute inset-0 opacity-15 pointer-events-none"
+        style={{
+          backgroundImage: `radial-gradient(#35A6F7 1px, transparent 1px)`,
+          backgroundSize: '32px 32px',
+        }}
+      />
+
+      {/* Main VisionONE Access AI Widget Container */}
+      <main className="relative z-10 w-full sm:max-w-[460px] h-screen sm:h-[720px] max-h-[100dvh] sm:max-h-[720px] flex flex-col justify-center">
+        <AssistantPanel
+          voiceState={voiceState}
+          messages={messages}
+          voiceSettings={voiceSettings}
+          micAmplitude={micAmplitude}
+          isTextInputOpen={isTextInputOpen}
+          activePlayingText={activePlayingText}
+          suggestedQuestions={suggestedQuestions}
+          onReset={() => {
+            speechSynthesisRef.current?.stop();
+            speechRecognitionRef.current?.stop();
+            setVoiceState('idle');
+            setMessages([INITIAL_WELCOME_MESSAGE]);
+            setSuggestedQuestions(INITIAL_WELCOME_MESSAGE.suggestedQuestions || []);
+          }}
+          onToggleMute={() => {
+            if (!voiceSettings.isMuted) {
+              speechSynthesisRef.current?.stop();
+              setVoiceState('idle');
+            }
+            setVoiceSettings((prev) => ({ ...prev, isMuted: !prev.isMuted }));
+          }}
+          onToggleMic={toggleMic}
+          onRetry={startListening}
+          onToggleTextInput={() => setIsTextInputOpen(!isTextInputOpen)}
+          onSendText={processUserMessage}
+          onSelectQuestion={(q) => processUserMessage(q)}
+          onPlayVoice={speakVoice}
+          onOpenCta={(type) => {
+            setLeadModalType(type);
+            setIsLeadModalOpen(true);
+          }}
+        />
+      </main>
+
+      {/* Lead Capture Modal */}
+      <LeadModal
+        isOpen={isLeadModalOpen}
+        onClose={() => setIsLeadModalOpen(false)}
+        onSubmit={handleLeadSubmit}
+        initialType={leadModalType}
+      />
+    </div>
+  );
+}
