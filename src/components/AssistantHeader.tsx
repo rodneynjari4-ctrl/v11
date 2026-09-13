@@ -16,7 +16,7 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
   return (
     <header
       id="visionone-assistant-header"
-      className="px-3.5 py-2.5 bg-gradient-to-r from-[#111A3A] via-[#15234D] to-[#1D8DE6] text-white flex items-center justify-between border-b border-white/10 select-none shadow-xs shrink-0"
+      className="px-3.5 py-2.5 bg-[#111A3A] text-white flex items-center justify-between border-b border-white/10 select-none shadow-xs shrink-0"
     >
       {/* Brand & Identity */}
       <div className="flex items-center gap-2.5">

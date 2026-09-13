@@ -102,8 +102,8 @@ export const LeadModal: React.FC<LeadModalProps> = ({
   };
 
   return (
-    <div id="visionone-lead-modal" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[#111A3A]/70 backdrop-blur-xs animate-fadeIn">
-      <div className="relative w-full max-w-[340px] sm:max-w-md bg-white rounded-2xl shadow-2xl border border-[#E5F0FE] overflow-hidden flex flex-col max-h-[92vh]">
+    <div id="visionone-lead-modal" className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#111A3A]/70 backdrop-blur-xs animate-fadeIn">
+      <div className="relative w-full max-w-[94vw] sm:max-w-md bg-white rounded-2xl shadow-2xl border border-[#E5F0FE] overflow-hidden flex flex-col max-h-[90dvh]">
         {/* Modal Header */}
         <div className="px-4 py-3 bg-gradient-to-r from-[#111A3A] to-[#1D8DE6] text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">

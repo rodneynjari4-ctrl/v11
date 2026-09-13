@@ -30,10 +30,10 @@ export const TextInputFallback: React.FC<TextInputFallbackProps> = ({
   };
 
   return (
-    <div className="px-3 pb-2 pt-1">
+    <div className="px-3 sm:px-4 pb-2.5 sm:pb-3 pt-1">
       <form
         onSubmit={handleSend}
-        className="flex items-center gap-1.5 p-1 bg-white rounded-2xl border border-[#1D8DE6]/25 shadow-xs focus-within:border-[#1D8DE6] focus-within:ring-2 focus-within:ring-[#1D8DE6]/15 transition-all"
+        className="flex items-center gap-1.5 p-1 sm:p-1.5 bg-white rounded-2xl border border-[#1D8DE6]/25 shadow-xs focus-within:border-[#1D8DE6] focus-within:ring-2 focus-within:ring-[#1D8DE6]/15 transition-all min-h-[44px]"
       >
         {/* Microphone Button integrated inside input bar */}
         <MicrophoneButton
@@ -50,18 +50,18 @@ export const TextInputFallback: React.FC<TextInputFallbackProps> = ({
           onChange={(e) => setInputText(e.target.value)}
           placeholder={voiceState === 'listening' ? 'Listening to speech...' : 'Type your question...'}
           disabled={disabled}
-          className="flex-1 px-2 py-1 text-xs text-[#111A3A] placeholder-[#111A3A]/45 outline-none bg-transparent font-['Inter'] min-w-0"
+          className="flex-1 px-2.5 py-1 text-sm sm:text-xs text-[#111A3A] placeholder-[#111A3A]/45 outline-none bg-transparent font-['Inter'] min-w-0"
         />
 
         {/* Send Button */}
         <button
           type="submit"
           disabled={!inputText.trim() || disabled}
-          className="w-8 h-8 rounded-xl flex items-center justify-center bg-[#1D8DE6] text-white hover:bg-[#111A3A] disabled:opacity-30 transition-colors cursor-pointer shrink-0"
+          className="w-9 h-9 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center bg-[#1D8DE6] text-white hover:bg-[#111A3A] disabled:opacity-30 active:scale-95 transition-all cursor-pointer shrink-0"
           aria-label="Send message"
           title="Send message"
         >
-          <Send className="w-3.5 h-3.5" />
+          <Send className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
         </button>
       </form>
     </div>

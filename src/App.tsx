@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { VoiceState, ChatMessage, VoiceSettings, LeadFormData } from './types';
+import { VoiceState, ChatMessage, VoiceSettings, LeadFormData, InteractionMode } from './types';
 import { AssistantPanel } from './components/AssistantPanel';
 import { LeadModal } from './components/LeadModal';
 import {
@@ -24,6 +24,7 @@ const INITIAL_WELCOME_MESSAGE: ChatMessage = {
 
 export default function App() {
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>('start');
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_WELCOME_MESSAGE]);
   const [micAmplitude, setMicAmplitude] = useState<number>(0);
   const [activePlayingText, setActivePlayingText] = useState<string | null>(null);
@@ -286,6 +287,24 @@ export default function App() {
     }
   };
 
+  const handleSelectTextChat = () => {
+    setInteractionMode('text');
+  };
+
+  const handleSelectVoiceChat = () => {
+    setInteractionMode('voice');
+    // Speak initial welcome and start listening
+    speakVoice(INITIAL_WELCOME_MESSAGE.voiceText || "Hello! What business area would you like to explore today?");
+    startListening();
+  };
+
+  const handleSelectQuestion = (question: string) => {
+    if (interactionMode === 'start') {
+      setInteractionMode('text');
+    }
+    processUserMessage(question);
+  };
+
   const handleLeadSubmit = async (leadData: LeadFormData): Promise<boolean> => {
     try {
       const res = await fetch('/api/lead', {
@@ -312,25 +331,17 @@ export default function App() {
   };
 
   return (
-    <div className="w-full h-screen min-h-[500px] max-h-screen bg-[#0E152E] text-[#111A3A] relative flex items-center justify-center p-1 sm:p-2 overflow-hidden">
-      {/* Deep Navy Atmosphere Background */}
-      <div className="absolute inset-0 bg-radial from-[#15234D]/90 via-[#0E152E] to-[#0A0F22] pointer-events-none" />
+    <div className="w-full h-[100dvh] bg-slate-100 text-[#111A3A] relative flex items-center justify-center p-0 sm:p-4 overflow-hidden">
+      {/* Subtle clean neutral backdrop */}
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200/70 pointer-events-none" />
 
-      {/* Ambient Grid Accent */}
-      <div
-        className="absolute inset-0 opacity-15 pointer-events-none"
-        style={{
-          backgroundImage: `radial-gradient(#35A6F7 1px, transparent 1px)`,
-          backgroundSize: '28px 28px',
-        }}
-      />
-
-      {/* Compact VisionONE Access AI Widget Container - Sized for standard iframe embeds */}
-      <main className="relative z-10 w-full max-w-[370px] h-full max-h-[560px] flex flex-col justify-center items-center">
+      {/* Responsive VisionONE Access AI Container - Slimmer Profile */}
+      <main className="relative z-10 w-full h-full sm:h-[88vh] sm:max-h-[660px] sm:max-w-[380px] flex flex-col justify-center items-center">
         <AssistantPanel
           voiceState={voiceState}
           messages={messages}
           voiceSettings={voiceSettings}
+          interactionMode={interactionMode}
           micAmplitude={micAmplitude}
           activePlayingText={activePlayingText}
           suggestedQuestions={suggestedQuestions}
@@ -340,6 +351,7 @@ export default function App() {
             setVoiceState('idle');
             setMessages([INITIAL_WELCOME_MESSAGE]);
             setSuggestedQuestions(INITIAL_WELCOME_MESSAGE.suggestedQuestions || []);
+            setInteractionMode('start');
           }}
           onToggleMute={() => {
             if (!voiceSettings.isMuted) {
@@ -351,8 +363,11 @@ export default function App() {
           onToggleMic={toggleMic}
           onRetry={startListening}
           onSendText={processUserMessage}
-          onSelectQuestion={(q) => processUserMessage(q)}
+          onSelectQuestion={handleSelectQuestion}
           onPlayVoice={speakVoice}
+          onSelectTextChat={handleSelectTextChat}
+          onSelectVoiceChat={handleSelectVoiceChat}
+          onSetInteractionMode={setInteractionMode}
           onOpenCta={(type) => {
             setLeadModalType(type);
             setIsLeadModalOpen(true);

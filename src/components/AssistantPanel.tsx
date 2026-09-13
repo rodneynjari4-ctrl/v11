@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
-import { VoiceState, ChatMessage, VoiceSettings } from '../types';
+import React from 'react';
+import { VoiceState, ChatMessage, VoiceSettings, InteractionMode } from '../types';
 import { AssistantHeader } from './AssistantHeader';
-import { VoiceOrb } from './VoiceOrb';
+import { StartModeView } from './StartModeView';
+import { VoiceModeView } from './VoiceModeView';
 import { TextInputFallback } from './TextInputFallback';
 import { ConversationTranscript } from './ConversationTranscript';
-import { Sparkles, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, MessageSquare, Mic, Home, ChevronRight } from 'lucide-react';
 
 interface AssistantPanelProps {
   voiceState: VoiceState;
   messages: ChatMessage[];
   voiceSettings: VoiceSettings;
+  interactionMode: InteractionMode;
   micAmplitude: number;
   activePlayingText: string | null;
   suggestedQuestions: string[];
@@ -21,6 +23,9 @@ interface AssistantPanelProps {
   onSelectQuestion: (question: string) => void;
   onPlayVoice: (text: string) => void;
   onOpenCta: (type: 'demo' | 'contact' | 'quote') => void;
+  onSelectTextChat: () => void;
+  onSelectVoiceChat: () => void;
+  onSetInteractionMode: (mode: InteractionMode) => void;
   micDisabled?: boolean;
 }
 
@@ -28,6 +33,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   voiceState,
   messages,
   voiceSettings,
+  interactionMode,
   micAmplitude,
   activePlayingText,
   suggestedQuestions,
@@ -39,80 +45,168 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   onSelectQuestion,
   onPlayVoice,
   onOpenCta,
+  onSelectTextChat,
+  onSelectVoiceChat,
+  onSetInteractionMode,
   micDisabled = false,
 }) => {
-  const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
+  const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+  const lastAssistantMessage = [...messages].reverse().find((m) => m.role === 'assistant');
 
   return (
     <div
       id="visionone-assistant-panel"
-      className="relative flex flex-col w-full h-full max-w-[370px] max-h-[560px] bg-white/98 backdrop-blur-xl rounded-2xl shadow-xl border border-[#E5F0FE] overflow-hidden transition-all duration-300 select-none text-[#111A3A]"
+      className="relative flex flex-col w-full h-full bg-white rounded-none sm:rounded-2xl shadow-xl border-0 sm:border sm:border-slate-200/90 overflow-hidden transition-all duration-300 select-none text-[#111A3A]"
     >
-      {/* Header */}
+      {/* Universal Header */}
       <AssistantHeader
         onReset={onReset}
         voiceSettings={voiceSettings}
         onToggleMute={onToggleMute}
       />
 
-      {/* Sub-tagline Bar */}
-      <div className="px-3.5 py-1 bg-[#E5F0FE]/50 border-b border-[#1D8DE6]/10 flex items-center justify-between shrink-0">
-        <span className="text-[10px] font-medium text-[#111A3A]/80 tracking-tight font-['Inter'] truncate">
-          Complete Business Visibility Guide
-        </span>
-        <button
-          onClick={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
-          className="shrink-0 text-[9px] font-semibold text-[#1D8DE6] hover:text-[#111A3A] flex items-center gap-0.5 cursor-pointer font-['Sora'] ml-2"
-          aria-label="Toggle transcript size"
-        >
-          <MessageSquare className="w-2.5 h-2.5" />
-          <span>{isTranscriptExpanded ? 'Show Orb' : 'Full Chat'}</span>
-          {isTranscriptExpanded ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronUp className="w-2.5 h-2.5" />}
-        </button>
-      </div>
+      {/* Mode Navigation & Sub-tagline Bar (Visible in Text or Voice mode, or as selector) */}
+      {interactionMode !== 'start' ? (
+        <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between shrink-0 gap-2">
+          {/* Back to Start Button */}
+          <button
+            onClick={() => onSetInteractionMode('start')}
+            className="text-[11px] font-semibold text-[#111A3A]/70 hover:text-[#1D8DE6] flex items-center gap-1 cursor-pointer font-['Sora'] py-0.5 px-1.5 rounded-md hover:bg-white transition"
+            title="Back to start selection"
+            aria-label="Back to start"
+          >
+            <Home className="w-3 h-3" />
+            <span className="hidden xs:inline">Start</span>
+          </button>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
-        {/* Voice Orb Area (collapsible if user switches to full transcript) */}
-        {!isTranscriptExpanded && (
-          <div className="transition-all duration-200 flex flex-col items-center justify-center shrink-0 pt-1 pb-0.5">
-            <VoiceOrb
-              state={voiceState}
-              amplitude={micAmplitude}
-              onRetry={onRetry}
-              onClick={onToggleMic}
-            />
+          {/* Two Buttons: Text Chat & Voice Chat Mode Switcher */}
+          <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs">
+            <button
+              id="tab-text-chat"
+              type="button"
+              onClick={() => onSetInteractionMode('text')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer font-['Sora'] ${
+                interactionMode === 'text'
+                  ? 'bg-gradient-to-r from-[#1D8DE6] to-[#35A6F7] text-white shadow-xs'
+                  : 'text-[#111A3A]/70 hover:text-[#111A3A] hover:bg-slate-50'
+              }`}
+              aria-label="Switch to Text Chat"
+            >
+              <MessageSquare className="w-3 h-3" />
+              <span>Text Chat</span>
+            </button>
+
+            <button
+              id="tab-voice-chat"
+              type="button"
+              onClick={() => {
+                onSetInteractionMode('voice');
+                if (voiceState !== 'listening' && voiceState !== 'speaking') {
+                  onToggleMic();
+                }
+              }}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer font-['Sora'] ${
+                interactionMode === 'voice'
+                  ? 'bg-gradient-to-r from-[#111A3A] to-[#15234D] text-white shadow-xs'
+                  : 'text-[#111A3A]/70 hover:text-[#111A3A] hover:bg-slate-50'
+              }`}
+              aria-label="Switch to Voice Chat"
+            >
+              <Mic className="w-3 h-3 text-emerald-400" />
+              <span>Voice Chat</span>
+            </button>
           </div>
-        )}
 
-        {/* Conversation Transcript Section */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <ConversationTranscript
-            messages={messages}
+          {/* Demo Action */}
+          <button
+            onClick={() => onOpenCta('demo')}
+            className="text-[10px] font-bold text-[#1D8DE6] hover:text-[#111A3A] flex items-center gap-0.5 cursor-pointer font-['Sora'] shrink-0"
+          >
+            <span>Demo</span>
+            <ChevronRight className="w-3 h-3" />
+          </button>
+        </div>
+      ) : (
+        <div className="px-3.5 py-1 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between shrink-0">
+          <span className="text-[10px] font-medium text-[#111A3A]/75 tracking-tight font-['Inter'] truncate">
+            Intelligent ERP & Business Visibility Guide
+          </span>
+          <span className="text-[9px] font-semibold text-[#1D8DE6] font-['Sora']">
+            VisionONE
+          </span>
+        </div>
+      )}
+
+      {/* Main Mode Body */}
+      {interactionMode === 'start' && (
+        <StartModeView
+          onSelectTextChat={onSelectTextChat}
+          onSelectVoiceChat={onSelectVoiceChat}
+          onSelectQuestion={onSelectQuestion}
+          onOpenCta={onOpenCta}
+        />
+      )}
+
+      {interactionMode === 'voice' && (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+          <VoiceModeView
+            voiceState={voiceState}
+            micAmplitude={micAmplitude}
+            lastAssistantMessage={lastAssistantMessage}
+            lastUserMessage={lastUserMessage}
+            suggestedQuestions={suggestedQuestions}
+            activePlayingText={activePlayingText}
+            onToggleMic={onToggleMic}
+            onRetry={onRetry}
             onPlayVoice={onPlayVoice}
             onSelectQuestion={onSelectQuestion}
+            onSwitchToTextChat={() => onSetInteractionMode('text')}
             onOpenCta={onOpenCta}
-            activePlayingText={activePlayingText}
-            suggestedQuestions={suggestedQuestions}
-            isThinking={voiceState === 'thinking'}
+            micDisabled={micDisabled}
+          />
+
+          {/* Collapsed Text Input Dock at bottom of Voice Mode so users can also type */}
+          <TextInputFallback
+            onSend={onSendText}
+            voiceState={voiceState}
+            onToggleMic={onToggleMic}
+            disabled={voiceState === 'thinking'}
+            micDisabled={micDisabled}
           />
         </div>
+      )}
 
-        {/* Unified Input Dock (Text Input + Integrated Mic Button + Send Button) */}
-        <TextInputFallback
-          onSend={onSendText}
-          voiceState={voiceState}
-          onToggleMic={onToggleMic}
-          disabled={voiceState === 'thinking'}
-          micDisabled={micDisabled}
-        />
-      </div>
+      {interactionMode === 'text' && (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+          {/* Full Conversation Transcript */}
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <ConversationTranscript
+              messages={messages}
+              onPlayVoice={onPlayVoice}
+              onSelectQuestion={onSelectQuestion}
+              onOpenCta={onOpenCta}
+              activePlayingText={activePlayingText}
+              suggestedQuestions={suggestedQuestions}
+              isThinking={voiceState === 'thinking'}
+            />
+          </div>
 
-      {/* Compact Footer */}
-      <footer className="px-3.5 py-1.5 bg-[#F8FAFC] border-t border-[#E5F0FE] flex items-center justify-between text-[10px] text-[#111A3A]/60 font-['Inter'] shrink-0">
+          {/* Unified Input Dock (Text Input + Integrated Mic Button + Send Button) */}
+          <TextInputFallback
+            onSend={onSendText}
+            voiceState={voiceState}
+            onToggleMic={onToggleMic}
+            disabled={voiceState === 'thinking'}
+            micDisabled={micDisabled}
+          />
+        </div>
+      )}
+
+      {/* Responsive Footer */}
+      <footer className="px-3.5 py-1.5 sm:py-2 bg-slate-50 border-t border-slate-200/80 flex items-center justify-between text-[10px] text-[#111A3A]/60 font-['Inter'] shrink-0 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
         <span className="flex items-center gap-1">
-          <Sparkles className="w-2.5 h-2.5 text-[#1D8DE6]" />
-          <span>VisionONE Access</span>
+          <Sparkles className="w-3 h-3 text-[#1D8DE6]" />
+          <span className="font-medium">VisionONE Access</span>
         </span>
         <button
           onClick={() => onOpenCta('demo')}

@@ -32,7 +32,7 @@ export const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
       disabled={disabled || isThinking}
       aria-label={getAriaLabel()}
       title={isListening ? 'Stop listening' : isSpeaking ? 'Interrupt AI and speak' : 'Speak with VisionONE'}
-      className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 focus:outline-none focus:ring-2 focus:ring-[#1D8DE6]/30 ${
+      className={`relative w-9 h-9 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 focus:outline-none focus:ring-2 focus:ring-[#1D8DE6]/30 active:scale-95 ${
         isListening
           ? 'bg-red-500 text-white shadow-md shadow-red-500/30 animate-pulse'
           : isSpeaking
@@ -47,11 +47,11 @@ export const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
 
       {/* Icon */}
       {isThinking ? (
-        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin" />
       ) : isListening ? (
-        <Square className="w-3 h-3 fill-current" />
+        <Square className="w-3.5 h-3.5 fill-current" />
       ) : (
-        <Mic className="w-3.5 h-3.5" />
+        <Mic className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
       )}
     </button>
   );
