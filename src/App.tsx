@@ -10,14 +10,14 @@ import {
 const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome-msg',
   role: 'assistant',
-  text: "Hi, I'm the VisionONE Access AI Assistant. I can help you explore our ERP, finance, HR and payroll, inventory, eTIMS compliance, and M-Pesa integrations.\n\nWhat would you like to explore today?",
-  voiceText: "Hi, I'm the VisionONE Access AI Assistant. What business area would you like to explore today?",
+  text: "Hello! I am your VisionONE Access AI guide. I can assist you with ERP, Finance & Accounting, HR & Payroll, Inventory, eTIMS tax compliance, and M-Pesa integration.\n\nWhat business area would you like to explore?",
+  voiceText: "Hello! I am your VisionONE Access AI guide. What business area would you like to explore today?",
   timestamp: Date.now(),
   suggestedQuestions: [
     'What modules are in VisionONE ERP?',
     'How does HR & Payroll work?',
     'Explain eTIMS tax compliance',
-    'How does M-Pesa integration work?',
+    'How does M-Pesa integrate?',
     'Can I book a demo?',
   ],
 };
@@ -26,21 +26,20 @@ export default function App() {
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_WELCOME_MESSAGE]);
   const [micAmplitude, setMicAmplitude] = useState<number>(0);
-  const [isTextInputOpen, setIsTextInputOpen] = useState(false);
   const [activePlayingText, setActivePlayingText] = useState<string | null>(null);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
     INITIAL_WELCOME_MESSAGE.suggestedQuestions || []
   );
 
-  // Lead qualification & capture modal
+  // Lead capture modal
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [leadModalType, setLeadModalType] = useState<'demo' | 'quote' | 'contact'>('demo');
 
-  // Warm male voice settings
+  // Warm resonant baritone male voice settings
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
     isMuted: false,
     rate: 1.0,
-    pitch: 0.94, // Warm resonant baritone male pitch
+    pitch: 0.94,
     continuousMode: false,
   });
 
@@ -75,7 +74,6 @@ export default function App() {
       };
       animFrameRef.current = requestAnimationFrame(updateAmp);
     } else if (voiceState === 'speaking') {
-      // Audio reactive amplitude oscillation
       let t = 0;
       const updateSpeakingAmp = () => {
         t += 0.16;
@@ -139,7 +137,7 @@ export default function App() {
     const trimmed = userText.trim();
     if (!trimmed) return;
 
-    // Immediately stop any active voice speech for instant response
+    // Immediately stop any active voice speech
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.stop();
     }
@@ -161,7 +159,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: trimmed,
-          history: updatedMessages.slice(-6).map((m) => ({ role: m.role, text: m.text })),
+          history: updatedMessages.slice(-8).map((m) => ({ role: m.role, text: m.text })),
         }),
       });
 
@@ -191,14 +189,20 @@ export default function App() {
       const spoken = data.voiceText || data.text;
       speakVoice(spoken);
     } catch (err) {
-      console.error('Failed to communicate with VisionONE AI:', err);
-      setVoiceState('error');
+      console.warn('Chat request fallback notice:', err);
+      setVoiceState('idle');
+
       const fallbackMsg: ChatMessage = {
         id: 'msg-err-' + Date.now(),
         role: 'assistant',
-        text: "VisionONE Access unifies ERP, Finance, HR & Payroll, and operations. Tap below to explore a live walkthrough.",
-        voiceText: "I'm ready to help you explore VisionONE. Tap below to book a live walkthrough.",
+        text: "VisionONE Access unifies ERP, Finance, HR & Payroll, and Inventory into a single real-time platform. Would you like to explore Finance, HR, or schedule a live demo?",
+        voiceText: "VisionONE connects your entire operations. Would you like to explore Finance, HR, or schedule a live demo?",
         timestamp: Date.now(),
+        suggestedQuestions: [
+          'What modules are in VisionONE ERP?',
+          'Tell me about HR & Payroll',
+          'Book a live walkthrough',
+        ],
         cta: {
           type: 'demo',
           label: 'Book a Demo',
@@ -206,10 +210,11 @@ export default function App() {
         },
       };
       setMessages((prev) => [...prev, fallbackMsg]);
+      speakVoice(fallbackMsg.voiceText!);
     }
   };
 
-  // Start microphone speech recognition
+  // Safe microphone speech recognition starter (never crashes or locks app in iframes)
   const startListening = async () => {
     // Interruption logic: halt current voice playback immediately
     if (speechSynthesisRef.current) {
@@ -217,21 +222,27 @@ export default function App() {
     }
 
     if (!speechRecognitionRef.current) {
-      setVoiceState('error');
+      const notice: ChatMessage = {
+        id: 'mic-unavail-' + Date.now(),
+        role: 'assistant',
+        text: 'Speech recognition is unavailable in this browser. You can type your question below.',
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, notice]);
       return;
     }
 
     const hasPerm = await speechRecognitionRef.current.requestMicrophonePermission();
     if (!hasPerm) {
-      setVoiceState('error');
+      // Keep voiceState idle rather than locking into a broken error state!
+      setVoiceState('idle');
       const errorMsg: ChatMessage = {
         id: 'mic-denied-' + Date.now(),
         role: 'assistant',
-        text: 'Microphone access is currently unavailable. You can chat with me using text below.',
+        text: 'Microphone access is restricted by your browser or iframe embed. You can type below or tap any suggested question, and I will speak back to you!',
         timestamp: Date.now(),
       };
       setMessages((prev) => [...prev, errorMsg]);
-      setIsTextInputOpen(true);
       return;
     }
 
@@ -246,9 +257,7 @@ export default function App() {
       },
       (error: string) => {
         console.warn('Recognition notice:', error);
-        if (voiceState === 'listening') {
-          setVoiceState('idle');
-        }
+        setVoiceState('idle');
       },
       () => {
         setVoiceState('listening');
@@ -289,10 +298,11 @@ export default function App() {
         const confirmMsg: ChatMessage = {
           id: 'lead-confirm-' + Date.now(),
           role: 'assistant',
-          text: `Thank you, ${leadData.name}! Your request has been forwarded to our enterprise team. A VisionONE senior business consultant will reach out shortly via ${leadData.email || leadData.phone}.`,
+          text: `Thank you, ${leadData.name}! Your request has been recorded. A VisionONE senior business consultant will reach out via ${leadData.email || leadData.phone}.`,
           timestamp: Date.now(),
         };
         setMessages((prev) => [...prev, confirmMsg]);
+        speakVoice(`Thank you ${leadData.name}. A VisionONE consultant will contact you shortly.`);
         return true;
       }
       return false;
@@ -302,7 +312,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#0E152E] text-[#111A3A] relative flex items-center justify-center p-0 sm:p-4 overflow-hidden">
+    <div className="w-full h-screen min-h-[500px] max-h-screen bg-[#0E152E] text-[#111A3A] relative flex items-center justify-center p-1 sm:p-2 overflow-hidden">
       {/* Deep Navy Atmosphere Background */}
       <div className="absolute inset-0 bg-radial from-[#15234D]/90 via-[#0E152E] to-[#0A0F22] pointer-events-none" />
 
@@ -311,18 +321,17 @@ export default function App() {
         className="absolute inset-0 opacity-15 pointer-events-none"
         style={{
           backgroundImage: `radial-gradient(#35A6F7 1px, transparent 1px)`,
-          backgroundSize: '32px 32px',
+          backgroundSize: '28px 28px',
         }}
       />
 
-      {/* Main VisionONE Access AI Widget Container */}
-      <main className="relative z-10 w-full sm:max-w-[460px] h-screen sm:h-[720px] max-h-[100dvh] sm:max-h-[720px] flex flex-col justify-center">
+      {/* Compact VisionONE Access AI Widget Container - Sized for standard iframe embeds */}
+      <main className="relative z-10 w-full max-w-[370px] h-full max-h-[560px] flex flex-col justify-center items-center">
         <AssistantPanel
           voiceState={voiceState}
           messages={messages}
           voiceSettings={voiceSettings}
           micAmplitude={micAmplitude}
-          isTextInputOpen={isTextInputOpen}
           activePlayingText={activePlayingText}
           suggestedQuestions={suggestedQuestions}
           onReset={() => {
@@ -341,7 +350,6 @@ export default function App() {
           }}
           onToggleMic={toggleMic}
           onRetry={startListening}
-          onToggleTextInput={() => setIsTextInputOpen(!isTextInputOpen)}
           onSendText={processUserMessage}
           onSelectQuestion={(q) => processUserMessage(q)}
           onPlayVoice={speakVoice}

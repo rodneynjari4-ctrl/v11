@@ -1,82 +1,67 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Keyboard, X } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Send } from 'lucide-react';
+import { VoiceState } from '../types';
+import { MicrophoneButton } from './MicrophoneButton';
 
 interface TextInputFallbackProps {
-  isOpen: boolean;
-  onToggle: () => void;
   onSend: (text: string) => void;
+  voiceState: VoiceState;
+  onToggleMic: () => void;
   disabled?: boolean;
+  micDisabled?: boolean;
 }
 
 export const TextInputFallback: React.FC<TextInputFallbackProps> = ({
-  isOpen,
-  onToggle,
   onSend,
+  voiceState,
+  onToggleMic,
   disabled = false,
+  micDisabled = false,
 }) => {
   const [inputText, setInputText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isOpen]);
-
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || disabled) return;
-    onSend(inputText.trim());
+    const trimmed = inputText.trim();
+    if (!trimmed || disabled) return;
+    onSend(trimmed);
     setInputText('');
   };
 
-  if (!isOpen) {
-    return (
-      <div className="flex justify-center pb-2">
-        <button
-          type="button"
-          onClick={onToggle}
-          className="text-[11px] font-medium text-[#1D8DE6] hover:text-[#111A3A] transition-colors flex items-center gap-1 px-3 py-1 rounded-full hover:bg-[#E5F0FE]/70 cursor-pointer font-['Inter']"
-        >
-          <Keyboard className="w-3.5 h-3.5" />
-          <span>Type instead</span>
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="px-4 pb-3 pt-1 animate-fadeIn">
+    <div className="px-3 pb-2 pt-1">
       <form
         onSubmit={handleSend}
-        className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#1D8DE6]/30 shadow-sm focus-within:border-[#1D8DE6] focus-within:ring-2 focus-within:ring-[#1D8DE6]/20 transition-all"
+        className="flex items-center gap-1.5 p-1 bg-white rounded-2xl border border-[#1D8DE6]/25 shadow-xs focus-within:border-[#1D8DE6] focus-within:ring-2 focus-within:ring-[#1D8DE6]/15 transition-all"
       >
+        {/* Microphone Button integrated inside input bar */}
+        <MicrophoneButton
+          state={voiceState}
+          onToggle={onToggleMic}
+          disabled={micDisabled || disabled}
+        />
+
+        {/* Text Input */}
         <input
           ref={inputRef}
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="Ask VisionONE anything..."
+          placeholder={voiceState === 'listening' ? 'Listening to speech...' : 'Type your question...'}
           disabled={disabled}
-          className="flex-1 px-3 py-1.5 text-xs text-[#111A3A] placeholder-[#111A3A]/40 outline-none bg-transparent font-['Inter']"
+          className="flex-1 px-2 py-1 text-xs text-[#111A3A] placeholder-[#111A3A]/45 outline-none bg-transparent font-['Inter'] min-w-0"
         />
 
+        {/* Send Button */}
         <button
           type="submit"
           disabled={!inputText.trim() || disabled}
-          className="w-8 h-8 rounded-xl flex items-center justify-center bg-[#1D8DE6] text-white hover:bg-[#35A6F7] disabled:opacity-40 transition-colors cursor-pointer shrink-0"
-          aria-label="Send text message"
+          className="w-8 h-8 rounded-xl flex items-center justify-center bg-[#1D8DE6] text-white hover:bg-[#111A3A] disabled:opacity-30 transition-colors cursor-pointer shrink-0"
+          aria-label="Send message"
+          title="Send message"
         >
           <Send className="w-3.5 h-3.5" />
-        </button>
-
-        <button
-          type="button"
-          onClick={onToggle}
-          className="w-8 h-8 rounded-xl flex items-center justify-center text-[#111A3A]/50 hover:text-[#111A3A] hover:bg-[#E5F0FE] transition-colors cursor-pointer shrink-0"
-          aria-label="Close text input"
-        >
-          <X className="w-3.5 h-3.5" />
         </button>
       </form>
     </div>

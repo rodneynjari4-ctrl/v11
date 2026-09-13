@@ -1,11 +1,13 @@
 /**
  * Speech Recognition and Speech Synthesis utilities for VisionONE Access AI
- * Configured specifically for a reliable, warm male voice experience.
+ * Configured specifically for a reliable, warm male voice experience
+ * and fully safe for iframe / WordPress embeds.
  */
 
 interface IWindow extends Window {
   webkitSpeechRecognition?: any;
   SpeechRecognition?: any;
+  webkitAudioContext?: typeof AudioContext;
 }
 
 export function isSpeechRecognitionSupported(): boolean {
@@ -16,6 +18,11 @@ export function isSpeechRecognitionSupported(): boolean {
 
 export function isSpeechSynthesisSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
+}
+
+export function isSecureContextOrLocal(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 }
 
 // Known female voice identifiers to strictly filter out
@@ -108,7 +115,6 @@ export class SpeechRecognitionManager {
           this.lastTranscript = currentText;
         }
 
-        // Clear existing silence timer
         if (this.silenceTimer) {
           clearTimeout(this.silenceTimer);
           this.silenceTimer = null;
@@ -120,14 +126,14 @@ export class SpeechRecognitionManager {
         } else if (currentText) {
           this.onResultCallback?.(currentText, false);
 
-          // If user pauses after speaking, auto-finalize after 1.4s of silence
+          // Auto-finalize on pause
           this.silenceTimer = setTimeout(() => {
             if (!this.isSubmitted && this.lastTranscript.trim()) {
               this.isSubmitted = true;
               this.onResultCallback?.(this.lastTranscript.trim(), true);
               this.stop();
             }
-          }, 1400);
+          }, 1300);
         }
       };
 
@@ -137,10 +143,9 @@ export class SpeechRecognitionManager {
           this.silenceTimer = null;
         }
 
-        if (event.error === 'not-allowed') {
-          this.onErrorCallback?.('Microphone access was denied. Please allow microphone permissions or use text chat.');
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          this.onErrorCallback?.('Microphone access is restricted by your browser or iframe embed. You can type below.');
         } else if (event.error === 'no-speech') {
-          // If we have some captured transcript, submit it instead of erroring
           if (this.lastTranscript.trim() && !this.isSubmitted) {
             this.isSubmitted = true;
             this.onResultCallback?.(this.lastTranscript.trim(), true);
@@ -148,7 +153,7 @@ export class SpeechRecognitionManager {
             this.onEndCallback?.();
           }
         } else if (event.error !== 'aborted') {
-          this.onErrorCallback?.(`Recognition notice: ${event.error}`);
+          this.onErrorCallback?.(event.error);
         }
         this.isListening = false;
       };
@@ -159,7 +164,6 @@ export class SpeechRecognitionManager {
           this.silenceTimer = null;
         }
 
-        // Fallback: If onend fired with an uncommitted transcript, submit it now
         if (this.lastTranscript.trim() && !this.isSubmitted) {
           this.isSubmitted = true;
           this.onResultCallback?.(this.lastTranscript.trim(), true);
@@ -169,7 +173,7 @@ export class SpeechRecognitionManager {
         this.onEndCallback?.();
       };
     } catch (err) {
-      console.error('Failed to initialize SpeechRecognition:', err);
+      console.warn('SpeechRecognition initialization notice:', err);
     }
   }
 
@@ -183,7 +187,7 @@ export class SpeechRecognitionManager {
       this.setupAudioAnalyser(stream);
       return true;
     } catch (err) {
-      console.warn('Microphone permission request failed:', err);
+      console.warn('Microphone permission request rejected or restricted:', err);
       return false;
     }
   }
@@ -199,7 +203,7 @@ export class SpeechRecognitionManager {
       source.connect(this.analyser);
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
     } catch (e) {
-      console.warn('Audio analyzer initialization skipped:', e);
+      console.warn('Audio analyzer skipped:', e);
     }
   }
 
@@ -227,7 +231,7 @@ export class SpeechRecognitionManager {
     onEnd?: () => void
   ) {
     if (!this.recognition) {
-      onError('Speech recognition is not supported in this browser. Please use modern Chrome, Edge, or Safari.');
+      onError('Microphone speech input is restricted or unsupported in this browser environment. You can type below.');
       return;
     }
 
@@ -247,16 +251,18 @@ export class SpeechRecognitionManager {
       this.recognition.start();
     } catch (err: any) {
       if (err.name === 'InvalidStateError') {
-        this.recognition.stop();
+        try {
+          this.recognition.stop();
+        } catch {}
         setTimeout(() => {
           try {
             this.recognition.start();
           } catch {
-            // Handled
+            onError('Could not start microphone. You can type your message below.');
           }
         }, 150);
       } else {
-        onError('Unable to start speech input. Please check microphone access.');
+        onError('Microphone input is restricted in this embed. You can type your question below.');
       }
     }
   }
@@ -270,9 +276,7 @@ export class SpeechRecognitionManager {
     if (this.recognition) {
       try {
         this.recognition.stop();
-      } catch {
-        // Handled
-      }
+      } catch {}
     }
   }
 
@@ -285,9 +289,7 @@ export class SpeechRecognitionManager {
     if (this.recognition) {
       try {
         this.recognition.abort();
-      } catch {
-        // Handled
-      }
+      } catch {}
     }
   }
 
@@ -322,38 +324,34 @@ export class SpeechSynthesisManager {
   }
 
   /**
-   * Deterministically finds and locks the best warm male voice on this device
+   * Deterministically locks a natural, warm baritone male voice
    */
   private selectWarmMaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
     if (!voices || voices.length === 0) return null;
 
-    // Filter to English voices
     const englishVoices = voices.filter((v) => v.lang.startsWith('en'));
-    const candidatePool = englishVoices.length > 0 ? englishVoices : voices;
+    const pool = englishVoices.length > 0 ? englishVoices : voices;
 
     let bestVoice: SpeechSynthesisVoice | null = null;
     let bestScore = -Infinity;
 
-    for (const voice of candidatePool) {
+    for (const voice of pool) {
       const lowerName = voice.name.toLowerCase();
       let score = 0;
 
-      // 1. Heavy penalty if known female voice
-      const isFemale = FEMALE_VOICE_PATTERNS.some((fem) => lowerName.includes(fem));
-      if (isFemale) {
+      // Filter out female voices
+      if (FEMALE_VOICE_PATTERNS.some((fem) => lowerName.includes(fem))) {
         score -= 5000;
       }
 
-      // 2. Priority check against top-tier warm male voices
+      // Priority list
       for (let i = 0; i < WARM_MALE_VOICE_PRIORITY.length; i++) {
-        const priorityName = WARM_MALE_VOICE_PRIORITY[i];
-        if (lowerName.includes(priorityName)) {
+        if (lowerName.includes(WARM_MALE_VOICE_PRIORITY[i])) {
           score += 1000 - i * 30;
           break;
         }
       }
 
-      // 3. Positive signal for male indicators
       if (lowerName.includes('male') && !lowerName.includes('female')) {
         score += 200;
       }
@@ -370,7 +368,7 @@ export class SpeechSynthesisManager {
       }
     }
 
-    return bestVoice || candidatePool[0] || null;
+    return bestVoice || pool[0] || null;
   }
 
   public isSpeaking(): boolean {
@@ -387,9 +385,7 @@ export class SpeechSynthesisManager {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       try {
         window.speechSynthesis.cancel();
-      } catch {
-        // Handled
-      }
+      } catch {}
     }
   }
 
@@ -408,10 +404,8 @@ export class SpeechSynthesisManager {
       return;
     }
 
-    // Cancel any current utterance immediately to ensure snappy responsiveness
     this.stop();
 
-    // Clean text of markdown, asterisks, URLs, and code brackets
     const cleanText = text
       .replace(/\*\*/g, '')
       .replace(/\*/g, '')
@@ -425,7 +419,6 @@ export class SpeechSynthesisManager {
       return;
     }
 
-    // If voices not initialized yet, try fetching again
     if (!this.warmMaleVoice) {
       const voices = window.speechSynthesis.getVoices();
       if (voices && voices.length > 0) {
@@ -435,9 +428,7 @@ export class SpeechSynthesisManager {
 
     return new Promise((resolve) => {
       const utterance = new SpeechSynthesisUtterance(cleanText);
-
-      // Warm male voice acoustics: slightly deeper pitch (0.94) and natural cadence (1.0)
-      utterance.pitch = options.pitch ?? 0.94;
+      utterance.pitch = options.pitch ?? 0.94; // Warm resonant baritone male pitch
       utterance.rate = options.rate ?? 1.0;
       utterance.lang = 'en-US';
 
@@ -457,15 +448,14 @@ export class SpeechSynthesisManager {
         this.isSpeakingState = true;
         options.onStart?.();
 
-        // Chrome SpeechSynthesis keep-alive fix (prevents audio cutting off on long phrases)
         if (this.chromeKeepAliveInterval) {
           clearInterval(this.chromeKeepAliveInterval);
         }
         this.chromeKeepAliveInterval = setInterval(() => {
-          if (window.speechSynthesis.speaking && window.speechSynthesis.paused) {
+          if (window.speechSynthesis?.speaking && window.speechSynthesis?.paused) {
             window.speechSynthesis.resume();
           }
-        }, 3000);
+        }, 2500);
       };
 
       utterance.onend = () => {

@@ -66,17 +66,14 @@ export const LeadModal: React.FC<LeadModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      setErrorMsg('Please enter your full name.');
-      return;
-    }
-    if (!formData.email.trim() && !formData.phone.trim()) {
-      setErrorMsg('Please provide either an email address or phone number.');
+    if (!formData.name.trim() || (!formData.email.trim() && !formData.phone.trim())) {
+      setErrorMsg('Please enter your name and either email or phone.');
       return;
     }
 
-    setErrorMsg('');
     setIsSubmitting(true);
+    setErrorMsg('');
+
     try {
       const success = await onSubmit(formData);
       if (success) {
@@ -92,30 +89,30 @@ export const LeadModal: React.FC<LeadModalProps> = ({
   };
 
   const getTitle = () => {
-    if (initialType === 'demo') return 'Schedule a VisionONE Access Demo';
-    if (initialType === 'quote') return 'Request a Tailored Quote';
-    return 'Talk to Our Business Consultants';
+    if (initialType === 'demo') return 'Schedule a Demo';
+    if (initialType === 'quote') return 'Request a Quote';
+    return 'Speak with Consultants';
   };
 
   const getSubtitle = () => {
     if (initialType === 'demo') {
-      return 'See how VisionONE connects ERP, Finance, HR & Payroll, and operations for complete business visibility.';
+      return 'See how VisionONE connects ERP, Finance, HR & Payroll, and operations.';
     }
     return 'Tell us about your organization and our team will prepare a tailored recommendation.';
   };
 
   return (
-    <div id="visionone-lead-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#111A3A]/60 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#E5F0FE] overflow-hidden flex flex-col max-h-[90vh]">
+    <div id="visionone-lead-modal" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[#111A3A]/70 backdrop-blur-xs animate-fadeIn">
+      <div className="relative w-full max-w-[340px] sm:max-w-md bg-white rounded-2xl shadow-2xl border border-[#E5F0FE] overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-[#111A3A] to-[#1D8DE6] text-white flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center backdrop-blur-md">
-              <Calendar className="w-4 h-4 text-white" />
+        <div className="px-4 py-3 bg-gradient-to-r from-[#111A3A] to-[#1D8DE6] text-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center backdrop-blur-md">
+              <Calendar className="w-3.5 h-3.5 text-white" />
             </div>
             <div>
-              <h3 className="text-base font-bold font-['Sora'] leading-tight">{getTitle()}</h3>
-              <p className="text-xs text-white/80 font-['Inter']">VisionONE Access Enterprise Platform</p>
+              <h3 className="text-xs sm:text-sm font-bold font-['Sora'] leading-tight">{getTitle()}</h3>
+              <p className="text-[10px] text-white/80 font-['Inter']">VisionONE Access Platform</p>
             </div>
           </div>
           <button
@@ -123,45 +120,45 @@ export const LeadModal: React.FC<LeadModalProps> = ({
             className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors"
             aria-label="Close modal"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-4">
+        <div className="p-4 overflow-y-auto space-y-3">
           {isSuccess ? (
-            <div className="py-8 text-center space-y-3">
-              <div className="w-14 h-14 mx-auto rounded-full bg-[#E5F0FE] text-[#1D8DE6] flex items-center justify-center">
-                <CheckCircle className="w-8 h-8" />
+            <div className="py-6 text-center space-y-2.5">
+              <div className="w-12 h-12 mx-auto rounded-full bg-[#E5F0FE] text-[#1D8DE6] flex items-center justify-center">
+                <CheckCircle className="w-6 h-6" />
               </div>
-              <h4 className="text-lg font-bold text-[#111A3A] font-['Sora']">Inquiry Received!</h4>
-              <p className="text-sm text-[#111A3A]/70 max-w-sm mx-auto font-['Inter']">
-                Thank you, <strong>{formData.name}</strong>. A VisionONE senior solutions specialist will contact you at{' '}
-                <strong>{formData.email || formData.phone}</strong> to coordinate your personalized session.
+              <h4 className="text-base font-bold text-[#111A3A] font-['Sora']">Inquiry Received!</h4>
+              <p className="text-xs text-[#111A3A]/70 max-w-xs mx-auto font-['Inter']">
+                Thank you, <strong>{formData.name}</strong>. A VisionONE specialist will reach out to you shortly via{' '}
+                <strong>{formData.email || formData.phone}</strong>.
               </p>
-              <div className="pt-4">
+              <div className="pt-2">
                 <button
                   onClick={onClose}
-                  className="px-6 py-2 rounded-xl text-sm font-semibold text-white bg-[#1D8DE6] hover:bg-[#35A6F7] shadow-sm transition-all"
+                  className="px-5 py-1.5 rounded-xl text-xs font-semibold text-white bg-[#1D8DE6] hover:bg-[#35A6F7] shadow-xs transition-all"
                 >
                   Return to Assistant
                 </button>
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <p className="text-xs text-[#111A3A]/70 font-['Inter']">{getSubtitle()}</p>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <p className="text-[11px] text-[#111A3A]/70 font-['Inter']">{getSubtitle()}</p>
 
               {errorMsg && (
-                <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600">
+                <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-600">
                   {errorMsg}
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
                 <div>
-                  <label className="block text-xs font-semibold text-[#111A3A] mb-1 flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-[#1D8DE6]" /> Full Name *
+                  <label className="block text-[11px] font-semibold text-[#111A3A] mb-0.5 flex items-center gap-1">
+                    <User className="w-3 h-3 text-[#1D8DE6]" /> Full Name *
                   </label>
                   <input
                     type="text"
@@ -169,88 +166,55 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g. Sarah Jenkins"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-[#E5F0FE] focus:border-[#1D8DE6] focus:ring-1 focus:ring-[#1D8DE6] outline-none transition"
+                    className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-[#E5F0FE] focus:border-[#1D8DE6] outline-none transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#111A3A] mb-1 flex items-center gap-1">
-                    <Building2 className="w-3.5 h-3.5 text-[#1D8DE6]" /> Company Name
+                  <label className="block text-[11px] font-semibold text-[#111A3A] mb-0.5 flex items-center gap-1">
+                    <Building2 className="w-3 h-3 text-[#1D8DE6]" /> Company Name
                   </label>
                   <input
                     type="text"
                     value={formData.companyName}
                     onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
                     placeholder="e.g. Apex Enterprises Ltd"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-[#E5F0FE] focus:border-[#1D8DE6] focus:ring-1 focus:ring-[#1D8DE6] outline-none transition"
+                    className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-[#E5F0FE] focus:border-[#1D8DE6] outline-none transition"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-[#111A3A] mb-1 flex items-center gap-1">
-                    <Mail className="w-3.5 h-3.5 text-[#1D8DE6]" /> Work Email *
+                  <label className="block text-[11px] font-semibold text-[#111A3A] mb-0.5 flex items-center gap-1">
+                    <Mail className="w-3 h-3 text-[#1D8DE6]" /> Work Email *
                   </label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="sarah@company.com"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-[#E5F0FE] focus:border-[#1D8DE6] focus:ring-1 focus:ring-[#1D8DE6] outline-none transition"
+                    className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-[#E5F0FE] focus:border-[#1D8DE6] outline-none transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#111A3A] mb-1 flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5 text-[#1D8DE6]" /> Phone / WhatsApp
+                  <label className="block text-[11px] font-semibold text-[#111A3A] mb-0.5 flex items-center gap-1">
+                    <Phone className="w-3 h-3 text-[#1D8DE6]" /> Phone / WhatsApp
                   </label>
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="+254 700 000 000"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-[#E5F0FE] focus:border-[#1D8DE6] focus:ring-1 focus:ring-[#1D8DE6] outline-none transition"
+                    className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-[#E5F0FE] focus:border-[#1D8DE6] outline-none transition"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#111A3A] mb-1">Industry</label>
-                  <select
-                    value={formData.industry}
-                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-[#E5F0FE] focus:border-[#1D8DE6] bg-white outline-none"
-                  >
-                    {INDUSTRIES.map((ind) => (
-                      <option key={ind} value={ind}>
-                        {ind}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#111A3A] mb-1">Company Size (Employees)</label>
-                  <select
-                    value={formData.employeeCount}
-                    onChange={(e) => setFormData({ ...formData, employeeCount: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-[#E5F0FE] focus:border-[#1D8DE6] bg-white outline-none"
-                  >
-                    <option value="1-10">1 – 10 users</option>
-                    <option value="11-50">11 – 50 users</option>
-                    <option value="51-200">51 – 200 users</option>
-                    <option value="200+">200+ enterprise users</option>
-                  </select>
-                </div>
-              </div>
-
               <div>
-                <label className="block text-xs font-semibold text-[#111A3A] mb-1.5 flex items-center gap-1">
-                  <Layers className="w-3.5 h-3.5 text-[#1D8DE6]" /> Areas of Interest
+                <label className="block text-[11px] font-semibold text-[#111A3A] mb-1 flex items-center gap-1">
+                  <Layers className="w-3 h-3 text-[#1D8DE6]" /> Modules of Interest
                 </label>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-2 gap-1">
                   {MODULE_OPTIONS.map((module) => {
                     const selected = formData.modulesInterested.includes(module);
                     return (
@@ -258,7 +222,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                         type="button"
                         key={module}
                         onClick={() => toggleModule(module)}
-                        className={`text-left text-[11px] px-2.5 py-1.5 rounded-lg border transition-all ${
+                        className={`text-left text-[10px] px-2 py-1 rounded-lg border transition-all truncate ${
                           selected
                             ? 'bg-[#E5F0FE] border-[#1D8DE6] text-[#111A3A] font-medium'
                             : 'bg-white border-[#E5F0FE] text-[#111A3A]/70 hover:border-[#1D8DE6]/50'
@@ -272,35 +236,24 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[#111A3A] mb-1">Notes / Key Requirements (Optional)</label>
-                <textarea
-                  rows={2}
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Tell us what business operations you are looking to streamline..."
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-[#E5F0FE] focus:border-[#1D8DE6] focus:ring-1 focus:ring-[#1D8DE6] outline-none transition"
-                />
-              </div>
-
               <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#E5F0FE]">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 text-xs font-medium text-[#111A3A]/70 hover:text-[#111A3A] transition-colors"
+                  className="px-3 py-1.5 text-xs font-medium text-[#111A3A]/70 hover:text-[#111A3A] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-[#1D8DE6] to-[#35A6F7] hover:opacity-95 shadow-md flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  className="px-4 py-1.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-[#1D8DE6] to-[#35A6F7] hover:opacity-95 shadow-xs flex items-center gap-1 disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmitting ? (
                     'Submitting...'
                   ) : (
                     <>
-                      <Send className="w-3.5 h-3.5" /> Submit Request
+                      <Send className="w-3 h-3" /> Submit
                     </>
                   )}
                 </button>
