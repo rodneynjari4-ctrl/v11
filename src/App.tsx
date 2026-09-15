@@ -11,7 +11,7 @@ const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome-msg',
   role: 'assistant',
   text: "Hello! I am your VisionONE Access AI guide. I can assist you with ERP, Finance & Accounting, HR & Payroll, Inventory, eTIMS tax compliance, and M-Pesa integration.\n\nWhat business area would you like to explore?",
-  voiceText: "Hello! I am your VisionONE Access AI guide. What business area would you like to explore today?",
+  voiceText: "Hello! Welcome to Vision One Access. What business area would you like to explore today?",
   timestamp: Date.now(),
   suggestedQuestions: [
     'What modules are in VisionONE ERP?',
@@ -36,11 +36,11 @@ export default function App() {
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [leadModalType, setLeadModalType] = useState<'demo' | 'quote' | 'contact'>('demo');
 
-  // Warm resonant baritone male voice settings
+  // Articulate natural warm male voice settings
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
     isMuted: false,
-    rate: 1.0,
-    pitch: 0.94,
+    rate: 0.98,
+    pitch: 1.0,
     continuousMode: false,
   });
 
@@ -293,9 +293,8 @@ export default function App() {
 
   const handleSelectVoiceChat = () => {
     setInteractionMode('voice');
-    // Speak initial welcome and start listening
-    speakVoice(INITIAL_WELCOME_MESSAGE.voiceText || "Hello! What business area would you like to explore today?");
-    startListening();
+    // Speak initial welcome clearly without immediately aborting the voice playback
+    speakVoice(INITIAL_WELCOME_MESSAGE.voiceText || "Hello! Welcome to Vision One Access. What business area would you like to explore today?");
   };
 
   const handleSelectQuestion = (question: string) => {
@@ -321,7 +320,7 @@ export default function App() {
           timestamp: Date.now(),
         };
         setMessages((prev) => [...prev, confirmMsg]);
-        speakVoice(`Thank you ${leadData.name}. A VisionONE consultant will contact you shortly.`);
+        speakVoice(`Thank you ${leadData.name}. A Vision One consultant will contact you shortly.`);
         return true;
       }
       return false;

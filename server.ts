@@ -58,7 +58,23 @@ Core message: "One Platform. Complete Business Visibility."
 PERSONALITY & TONE:
 - Warm, human, consultative, concise, confident, professional.
 - Avoid robotic repetition and corporate jargon.
-- Voice response style: The "voiceText" field MUST be very short (1-2 natural spoken sentences, conversational, warm, no markdown, no URLs, no bullet lists). The "text" field can provide crisp transcript details.
+
+CRITICAL VOICE NATURALNESS & PHONETIC PRONUNCIATION INSTRUCTIONS FOR "voiceText":
+- The "voiceText" field is spoken aloud to the user using speech synthesis.
+- It MUST be written for maximum spoken naturalness and correct human pronunciation:
+  * Pronounce acronyms phonetically: write "E-R-P" (never "ERP", which synthesizers mispronounce as "urp").
+  * Write "Em-Pesa" (never "M-Pesa" which synthesizers stumble on as "m minus pesa").
+  * Write "ee-Tims" (never "eTIMS" which synthesizers mispronounce as "eh-tims").
+  * Write "K-R-A" (never "krah").
+  * Write "H-R and Payroll" (never "HR/Payroll").
+  * Write "S-T-K Push" (never "stuck push").
+  * Write "Pay Bill" (never "PayBill").
+  * Write "Vision One" (never "VisionONE").
+  * Write "and" instead of "&", "percent" instead of "%".
+- Keep voiceText to 1 to 2 warm, conversational sentences that flow naturally when spoken out loud.
+- Never include markdown, bullet points, numbered lists like "1.", URLs, parentheses, or emojis in voiceText.
+- Use natural pauses (commas) between clauses so the voice breathes naturally.
+- The "text" field can provide detailed transcript information with standard formatting.
 
 CRITICAL ANTI-REPETITION RULES:
 - Never repeat the same question or closing prompt on consecutive turns.
@@ -90,7 +106,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
   if (query.includes("demo") || query.includes("schedule") || query.includes("book") || query.includes("walkthrough") || query.includes("see it")) {
     return {
       text: "We would love to show you VisionONE Access in action! You can schedule a live 30-minute tailored walkthrough with our senior solution specialists.",
-      voiceText: "I'd be glad to arrange a live demonstration for your team. You can pick a convenient time right here.",
+      voiceText: "I would be glad to arrange a live demonstration for your team. You can pick a convenient time right here.",
       intent: "demo_request",
       suggestedQuestions: ["What happens during a demo?", "Can multiple team members join?", "What modules will be shown?"],
       cta: { type: "demo", label: "Book a Demo", description: "Schedule a tailored 30-minute walkthrough" },
@@ -110,7 +126,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
   if (query.includes("module") || query.includes("erp") || query.includes("features") || query.includes("what does visionone do") || query.includes("what is visionone")) {
     return {
       text: "VisionONE ERP includes five core pillars:\n1. Finance & Accounting (ledger, bank reconciliation, multi-currency)\n2. HR & Payroll (statutory deductions, biometric clock-in, self-service)\n3. Inventory & Procurement (multi-warehouse, purchase approvals)\n4. KRA eTIMS Integration (automated electronic invoicing)\n5. M-Pesa Integration (STK Push, PayBill/Till reconciliation).",
-      voiceText: "VisionONE ERP unifies Finance, HR and Payroll, Inventory, eTIMS tax compliance, and automated M-Pesa reconciliation into one connected platform.",
+      voiceText: "Vision One E-R-P unifies Finance, H-R and Payroll, Inventory, ee-Tims tax compliance, and automated Em-Pesa reconciliation into one connected platform.",
       intent: "product_inquiry",
       suggestedQuestions: ["Tell me about HR & Payroll", "How does eTIMS work?", "Explain M-Pesa integration"],
       cta: null,
@@ -120,7 +136,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
   if (query.includes("payroll") || query.includes("hr") || query.includes("salary") || query.includes("statutory") || query.includes("attendance") || query.includes("biometric") || query.includes("leave")) {
     return {
       text: "VisionONE HR & Payroll automates monthly statutory deductions, biometric clock-in attendance tracking, leave management, and employee self-service payslips with built-in audit controls and anomaly detection.",
-      voiceText: "Our HR and Payroll module automates statutory deductions, biometric attendance, and employee self-service with complete accuracy.",
+      voiceText: "Our H-R and Payroll module automates statutory deductions, biometric attendance, and employee self-service with complete accuracy.",
       intent: "product_inquiry",
       suggestedQuestions: ["How does biometric clock-in connect?", "Can staff access payslips on mobile?", "Book a Payroll Demo"],
       cta: null,
@@ -130,7 +146,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
   if (query.includes("etims") || query.includes("kra") || query.includes("tax") || query.includes("invoice") || query.includes("fiscal")) {
     return {
       text: "VisionONE Access connects directly with KRA eTIMS, enabling automated electronic invoice signing, fiscal compliance, and secure transmission without manual re-entry.",
-      voiceText: "VisionONE connects directly to KRA eTIMS for automated invoice signing and complete tax compliance.",
+      voiceText: "Vision One connects directly to K-R-A ee-Tims for automated invoice signing and complete tax compliance.",
       intent: "product_inquiry",
       suggestedQuestions: ["How are credit notes handled?", "Does it work with existing sales invoices?", "Book an eTIMS Walkthrough"],
       cta: null,
@@ -140,7 +156,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
   if (query.includes("mpesa") || query.includes("m-pesa") || query.includes("payment") || query.includes("stk") || query.includes("paybill") || query.includes("till")) {
     return {
       text: "Our M-Pesa integration connects STK Push prompts, PayBill, and Till numbers directly to customer ledgers with instant receipting and automated bank reconciliation.",
-      voiceText: "Our M-Pesa integration automates STK Push and PayBill reconciliation directly into your customer ledger.",
+      voiceText: "Our Em-Pesa integration automates S-T-K Push and Pay Bill reconciliation directly into your customer ledger.",
       intent: "product_inquiry",
       suggestedQuestions: ["Does it support automated receipting?", "How are exceptions handled?", "Explore Finance Integration"],
       cta: null,
@@ -160,7 +176,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
   if (query.includes("inventory") || query.includes("stock") || query.includes("procurement") || query.includes("warehouse") || query.includes("purchase")) {
     return {
       text: "VisionONE Inventory & Procurement tracks real-time stock levels across multiple warehouses, triggers automated reorder alerts, and routes purchase orders through approval workflows.",
-      voiceText: "VisionONE tracks multi-warehouse inventory in real time and automates purchase order approval workflows.",
+      voiceText: "Vision One tracks multi-warehouse inventory in real time and automates purchase order approval workflows.",
       intent: "product_inquiry",
       suggestedQuestions: ["Does it support multi-warehouse transfers?", "How do purchase approval chains work?", "Can I see a demo?"],
       cta: null,
@@ -170,7 +186,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
   if (query.includes("maker") || query.includes("checker") || query.includes("security") || query.includes("permission") || query.includes("role") || query.includes("control")) {
     return {
       text: "VisionONE features enterprise internal controls including segregation of duties, multi-tier maker-checker approvals for payments and journal entries, and tamper-evident audit logs.",
-      voiceText: "VisionONE includes maker-checker approval workflows, role-based access, and detailed audit trails for internal security.",
+      voiceText: "Vision One includes maker-checker approval workflows, role-based access, and detailed audit trails for internal security.",
       intent: "product_inquiry",
       suggestedQuestions: ["How do approval thresholds work?", "Can roles be customized?", "Explore Finance & Controls"],
       cta: null,
@@ -180,7 +196,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
   if (query.includes("construction") || query.includes("manufacturing") || query.includes("agriculture") || query.includes("distribution") || query.includes("property")) {
     return {
       text: "VisionONE Access supports industry-specific workflows, including job costing and project accounting for construction, bill of materials for manufacturing, and produce tracking for agriculture.",
-      voiceText: "VisionONE supports specialized workflows for manufacturing, construction, distribution, and agriculture.",
+      voiceText: "Vision One supports specialized workflows for manufacturing, construction, distribution, and agriculture.",
       intent: "industry_fit",
       suggestedQuestions: ["Tell me about project costing", "How does batch tracking work?", "Schedule an industry consultation"],
       cta: null,
@@ -191,7 +207,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
     if (historyText.includes("hr") || historyText.includes("payroll")) {
       return {
         text: "In HR & Payroll, VisionONE automates PAYE, NSSF, NHIF/SHIF, and housing levy calculations. Employees can log in via Self-Service to view payslips and request leave.",
-        voiceText: "VisionONE automates all statutory payroll calculations and gives your team employee self-service access.",
+        voiceText: "Vision One automates all statutory payroll calculations and gives your team employee self-service access.",
         intent: "product_inquiry",
         suggestedQuestions: ["How does biometric clock-in work?", "Can staff view payslips on mobile?", "Book a live demo"],
         cta: null,
@@ -200,7 +216,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
     if (historyText.includes("etims")) {
       return {
         text: "With eTIMS, every confirmed invoice is automatically signed with a cryptographically verified fiscal code and transmitted to KRA, avoiding manual reconciliation.",
-        voiceText: "Every confirmed invoice is cryptographically signed and submitted to eTIMS without manual steps.",
+        voiceText: "Every confirmed invoice is cryptographically signed and submitted to ee-Tims without manual steps.",
         intent: "product_inquiry",
         suggestedQuestions: ["Can I see an eTIMS invoice sample?", "How does it connect to accounting?", "Schedule a demo"],
         cta: null,
@@ -208,7 +224,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
     }
     return {
       text: "VisionONE Access gives executives and managers complete visibility across operations, eliminating data silos between departments. Would you like to explore Finance, HR, or Operations next?",
-      voiceText: "VisionONE eliminates data silos across departments. Would you like to look closer at Finance, HR, or Inventory next?",
+      voiceText: "Vision One eliminates data silos across departments. Would you like to look closer at Finance, H-R, or Inventory next?",
       intent: "product_inquiry",
       suggestedQuestions: ["Explore Finance & Accounting", "Learn about HR & Payroll", "See Inventory & Procurement"],
       cta: null,
@@ -218,7 +234,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
   if (query.includes("hi") || query.includes("hello") || query.includes("hey") || query.includes("morning") || query.includes("afternoon")) {
     return {
       text: "Hello! Welcome to VisionONE Access. I am your intelligent guide to achieving complete business visibility across your entire organization. How can I help you today?",
-      voiceText: "Hello! Welcome to VisionONE Access. What operational area would you like to explore today?",
+      voiceText: "Hello! Welcome to Vision One Access. What operational area would you like to explore today?",
       intent: "greeting",
       suggestedQuestions: ["What modules are in VisionONE ERP?", "How does HR & Payroll work?", "Explain eTIMS tax compliance"],
       cta: null,
@@ -228,7 +244,7 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
   // Dynamic context-aware default
   return {
     text: "VisionONE Access is an integrated cloud business platform unifying ERP, Finance, HR & Payroll, Inventory, and payment reconciliations into a single real-time source of truth.",
-    voiceText: "VisionONE Access brings complete business visibility to your operations. Which area would you like to explore?",
+    voiceText: "Vision One Access brings complete business visibility to your operations. Which area would you like to explore?",
     intent: "product_inquiry",
     suggestedQuestions: ["What modules does VisionONE offer?", "How does M-Pesa integrate?", "Can I book a demo?"],
     cta: null,
