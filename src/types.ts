@@ -2,7 +2,7 @@ export type VoiceState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error
 
 export type AssistantMode = 'widget' | 'panel' | 'fullscreen' | 'embed';
 
-export type InteractionMode = 'start' | 'text' | 'voice';
+export type InteractionMode = 'voice';
 
 export interface ChatMessage {
   id: string;

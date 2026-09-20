@@ -184,6 +184,7 @@ export function normalizeTextForNaturalSpeech(rawText: string): string {
 export class SpeechRecognitionManager {
   private recognition: any = null;
   private isListening = false;
+  private shouldBeListening = false;
   private onResultCallback?: (text: string, isFinal: boolean) => void;
   private onErrorCallback?: (error: string) => void;
   private onEndCallback?: () => void;
@@ -197,6 +198,7 @@ export class SpeechRecognitionManager {
   private lastTranscript = '';
   private isSubmitted = false;
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
+  private restartTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.initRecognition();
@@ -248,18 +250,20 @@ export class SpeechRecognitionManager {
 
         if (finalTranscript && currentText && !this.isSubmitted) {
           this.isSubmitted = true;
+          this.shouldBeListening = false;
           this.onResultCallback?.(currentText, true);
         } else if (currentText) {
           this.onResultCallback?.(currentText, false);
 
-          // Auto-finalize on pause
+          // Auto-finalize on natural speech pause (1.2s of silence)
           this.silenceTimer = setTimeout(() => {
             if (!this.isSubmitted && this.lastTranscript.trim()) {
               this.isSubmitted = true;
+              this.shouldBeListening = false;
               this.onResultCallback?.(this.lastTranscript.trim(), true);
               this.stop();
             }
-          }, 1300);
+          }, 1200);
         }
       };
 
@@ -270,15 +274,25 @@ export class SpeechRecognitionManager {
         }
 
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          this.onErrorCallback?.('Microphone access is restricted by your browser or iframe embed. You can type below.');
+          this.shouldBeListening = false;
+          this.onErrorCallback?.('Microphone access is restricted by your browser. Please allow microphone permissions.');
         } else if (event.error === 'no-speech') {
           if (this.lastTranscript.trim() && !this.isSubmitted) {
             this.isSubmitted = true;
+            this.shouldBeListening = false;
             this.onResultCallback?.(this.lastTranscript.trim(), true);
+          } else if (this.shouldBeListening) {
+            // Keep listening automatically when silence occurs
+            this.scheduleAutoRestart();
+            return;
           } else {
             this.onEndCallback?.();
           }
         } else if (event.error !== 'aborted') {
+          if (this.shouldBeListening) {
+            this.scheduleAutoRestart();
+            return;
+          }
           this.onErrorCallback?.(event.error);
         }
         this.isListening = false;
@@ -292,15 +306,38 @@ export class SpeechRecognitionManager {
 
         if (this.lastTranscript.trim() && !this.isSubmitted) {
           this.isSubmitted = true;
+          this.shouldBeListening = false;
           this.onResultCallback?.(this.lastTranscript.trim(), true);
+          this.isListening = false;
+          return;
         }
 
         this.isListening = false;
+
+        // Automatically maintain active listening loop if expected to be listening hands-free
+        if (this.shouldBeListening && !this.isSubmitted) {
+          this.scheduleAutoRestart();
+          return;
+        }
+
         this.onEndCallback?.();
       };
     } catch (err) {
       console.warn('SpeechRecognition initialization notice:', err);
     }
+  }
+
+  private scheduleAutoRestart() {
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+    }
+    this.restartTimer = setTimeout(() => {
+      if (this.shouldBeListening && !this.isListening) {
+        try {
+          this.recognition?.start();
+        } catch {}
+      }
+    }, 150);
   }
 
   public async requestMicrophonePermission(): Promise<boolean> {
@@ -357,15 +394,20 @@ export class SpeechRecognitionManager {
     onEnd?: () => void
   ) {
     if (!this.recognition) {
-      onError('Microphone speech input is restricted or unsupported in this browser environment. You can type below.');
+      onError('Microphone speech input is restricted or unsupported in this browser environment.');
       return;
     }
 
+    this.shouldBeListening = true;
     this.lastTranscript = '';
     this.isSubmitted = false;
     if (this.silenceTimer) {
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
+    }
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
     }
 
     this.onResultCallback = onResult;
@@ -382,22 +424,29 @@ export class SpeechRecognitionManager {
         } catch {}
         setTimeout(() => {
           try {
-            this.recognition.start();
+            if (this.shouldBeListening) {
+              this.recognition.start();
+            }
           } catch {
-            onError('Could not start microphone. You can type your message below.');
+            onError('Could not start microphone.');
           }
         }, 150);
       } else {
-        onError('Microphone input is restricted in this embed. You can type your question below.');
+        onError('Microphone input could not be started.');
       }
     }
   }
 
   public stop() {
+    this.shouldBeListening = false;
     this.isListening = false;
     if (this.silenceTimer) {
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
+    }
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
     }
     if (this.recognition) {
       try {
@@ -407,10 +456,15 @@ export class SpeechRecognitionManager {
   }
 
   public abort() {
+    this.shouldBeListening = false;
     this.isListening = false;
     if (this.silenceTimer) {
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
+    }
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
     }
     if (this.recognition) {
       try {

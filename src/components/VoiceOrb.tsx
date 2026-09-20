@@ -130,30 +130,30 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
   const getStateTitle = () => {
     switch (state) {
       case 'idle':
-        return 'How can I assist you?';
+        return 'Hands-Free Voice AI';
       case 'listening':
-        return 'Listening...';
+        return 'Listening automatically...';
       case 'thinking':
-        return 'Thinking...';
+        return 'Analyzing your question...';
       case 'speaking':
         return 'VisionONE is speaking...';
       case 'error':
-        return 'Microphone unavailable';
+        return 'Microphone permission needed';
     }
   };
 
   const getStateSubtext = () => {
     switch (state) {
       case 'idle':
-        return 'Tap orb to speak or type below';
+        return 'Hands-free mode active — speak anytime';
       case 'listening':
-        return 'Speak your question naturally';
+        return 'Speak naturally without pressing any button';
       case 'thinking':
         return 'Consulting enterprise knowledge...';
       case 'speaking':
-        return 'Tap orb or mic to interrupt';
+        return 'Speaking response (tap orb to pause or interrupt)';
       case 'error':
-        return 'You can chat using the text input below';
+        return 'Please allow microphone access in your browser';
     }
   };
 
@@ -163,7 +163,7 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
       <div 
         onClick={onClick}
         className="relative w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center cursor-pointer group active:scale-95 transition-transform"
-        title="Tap to speak"
+        title="Hands-free Voice AI (tap to toggle/interrupt)"
       >
         {/* Ambient Outer Halo */}
         <div
