@@ -2,32 +2,32 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { VoiceState, ChatMessage, VoiceSettings, LeadFormData } from './types';
 import { AssistantPanel } from './components/AssistantPanel';
 import { LeadModal } from './components/LeadModal';
-import {
-  SpeechRecognitionManager,
-  SpeechSynthesisManager,
-} from './lib/speech';
+import { SpeechRecognitionManager, SpeechSynthesisManager } from './lib/speech';
+import { Mic, Sparkles } from 'lucide-react';
 
 const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome-msg',
   role: 'assistant',
-  text: "Hello! I am your VisionONE Access AI guide. I can assist you with ERP, Finance & Accounting, HR & Payroll, Inventory, eTIMS tax compliance, and M-Pesa integration.\n\nWhat business area would you like to explore?",
+  text: "Hello! Welcome to VisionONE Access. I am your voice-first AI guide. You can ask me about ERP, Finance & Accounting, HR & Payroll, Inventory, or eTIMS compliance. Tap to speak to begin!",
   voiceText: "Hello! Welcome to Vision One Access. What business area would you like to explore today?",
   timestamp: Date.now(),
   suggestedQuestions: [
     'What modules are in VisionONE ERP?',
-    'How does HR & Payroll work?',
-    'Explain eTIMS tax compliance',
-    'How does M-Pesa integrate?',
-    'Can I book a demo?',
+    'Tell me about HR & Payroll',
+    'How does eTIMS compliance work?',
+    'Book a live walkthrough',
   ],
 };
 
 export default function App() {
+  const [isOpen, setIsOpen] = useState<boolean>(true);
+  const [hasStarted, setHasStarted] = useState<boolean>(false);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [isAutoListening, setIsAutoListening] = useState<boolean>(true);
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_WELCOME_MESSAGE]);
   const [micAmplitude, setMicAmplitude] = useState<number>(0);
   const [activePlayingText, setActivePlayingText] = useState<string | null>(null);
+  const [liveTranscript, setLiveTranscript] = useState<string>('');
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
     INITIAL_WELCOME_MESSAGE.suggestedQuestions || []
   );
@@ -50,12 +50,20 @@ export default function App() {
   const animFrameRef = useRef<number | null>(null);
   const isAutoListeningRef = useRef<boolean>(true);
   isAutoListeningRef.current = isAutoListening;
-  const hasInitializedVoiceRef = useRef<boolean>(false);
 
   // Initialize Speech Managers on mount
   useEffect(() => {
     speechRecognitionRef.current = new SpeechRecognitionManager();
     speechSynthesisRef.current = new SpeechSynthesisManager();
+
+    // User interaction audio unlock
+    const unlockAudio = () => {
+      if (speechSynthesisRef.current) {
+        speechSynthesisRef.current.resume();
+      }
+    };
+    window.addEventListener('pointerdown', unlockAudio, { once: true });
+    window.addEventListener('click', unlockAudio, { once: true });
 
     return () => {
       speechRecognitionRef.current?.stop();
@@ -63,6 +71,8 @@ export default function App() {
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('click', unlockAudio);
     };
   }, []);
 
@@ -131,8 +141,11 @@ export default function App() {
     speechRecognitionRef.current.start(
       (text: string, isFinal: boolean) => {
         if (isFinal && text.trim()) {
+          setLiveTranscript('');
           speechRecognitionRef.current?.stop();
-          processUserMessage(text);
+          processUserMessage(text.trim());
+        } else {
+          setLiveTranscript(text);
         }
       },
       (error: string) => {
@@ -154,6 +167,7 @@ export default function App() {
 
   const stopListening = useCallback(() => {
     speechRecognitionRef.current?.stop();
+    setLiveTranscript('');
     setVoiceState('idle');
   }, []);
 
@@ -181,7 +195,7 @@ export default function App() {
           },
           onEnd: () => {
             setActivePlayingText(null);
-            // AUTOMATIC CONTINUOUS LOOP: immediately resume listening without tapping!
+            // AUTOMATIC CONTINUOUS LOOP: immediately resume listening hands-free without tapping!
             if (autoListenAfter && isAutoListeningRef.current) {
               startListening();
             } else {
@@ -208,38 +222,6 @@ export default function App() {
     [voiceSettings, startListening]
   );
 
-  // Auto-start voice immediately on initial load
-  useEffect(() => {
-    if (hasInitializedVoiceRef.current) return;
-    hasInitializedVoiceRef.current = true;
-
-    const timer = setTimeout(() => {
-      speakVoice(
-        INITIAL_WELCOME_MESSAGE.voiceText ||
-          "Hello! Welcome to Vision One Access. What business area would you like to explore today?",
-        true
-      );
-    }, 450);
-
-    // If browser autoplay policies require a user gesture, the first click/touch unlocks audio immediately
-    const unlockAudio = () => {
-      window.removeEventListener('pointerdown', unlockAudio);
-      window.removeEventListener('click', unlockAudio);
-      if (speechSynthesisRef.current) {
-        speechSynthesisRef.current.resume();
-      }
-    };
-
-    window.addEventListener('pointerdown', unlockAudio, { once: true });
-    window.addEventListener('click', unlockAudio, { once: true });
-
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('pointerdown', unlockAudio);
-      window.removeEventListener('click', unlockAudio);
-    };
-  }, [speakVoice]);
-
   // Send message to server-side AI
   const processUserMessage = async (userText: string) => {
     const trimmed = userText.trim();
@@ -252,6 +234,7 @@ export default function App() {
     if (speechRecognitionRef.current) {
       speechRecognitionRef.current.stop();
     }
+    setLiveTranscript('');
 
     const newUserMsg: ChatMessage = {
       id: 'msg-' + Date.now(),
@@ -325,14 +308,22 @@ export default function App() {
     }
   };
 
-  // Toggle or interrupt mic
+  // Toggle or start mic: first tap initiates speaking, then hands-free continues automatically
   const toggleMic = () => {
+    if (!hasStarted) {
+      // First tap to speak: start listening immediately!
+      setHasStarted(true);
+      setIsAutoListening(true);
+      startListening();
+      return;
+    }
+
     if (voiceState === 'listening') {
       // User tapped while listening -> Pause automatic listening
       setIsAutoListening(false);
       stopListening();
     } else if (voiceState === 'speaking') {
-      // User tapped while AI was speaking -> Interrupt speech and start listening to user immediately!
+      // User tapped while AI was speaking -> Interrupt speech and listen immediately
       speechSynthesisRef.current?.stop();
       setIsAutoListening(true);
       startListening();
@@ -344,8 +335,25 @@ export default function App() {
   };
 
   const handleSelectQuestion = (question: string) => {
+    setHasStarted(true);
     setIsAutoListening(true);
     processUserMessage(question);
+  };
+
+  const handleCloseAssistant = () => {
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.stop();
+    }
+    if (speechRecognitionRef.current) {
+      speechRecognitionRef.current.stop();
+    }
+    setVoiceState('idle');
+    setLiveTranscript('');
+    setIsOpen(false);
+  };
+
+  const handleOpenAssistant = () => {
+    setIsOpen(true);
   };
 
   const handleLeadSubmit = async (leadData: LeadFormData): Promise<boolean> => {
@@ -378,41 +386,83 @@ export default function App() {
       {/* Subtle clean neutral backdrop */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200/70 pointer-events-none" />
 
-      {/* Responsive VisionONE Access AI Container - Direct Voice Interface */}
-      <main className="relative z-10 w-full h-full sm:h-[88vh] sm:max-h-[660px] sm:max-w-[380px] flex flex-col justify-center items-center">
-        <AssistantPanel
-          voiceState={voiceState}
-          messages={messages}
-          voiceSettings={voiceSettings}
-          micAmplitude={micAmplitude}
-          activePlayingText={activePlayingText}
-          suggestedQuestions={suggestedQuestions}
-          onReset={() => {
-            speechSynthesisRef.current?.stop();
-            speechRecognitionRef.current?.stop();
-            setVoiceState('idle');
-            setMessages([INITIAL_WELCOME_MESSAGE]);
-            setSuggestedQuestions(INITIAL_WELCOME_MESSAGE.suggestedQuestions || []);
-            setIsAutoListening(true);
-            speakVoice(INITIAL_WELCOME_MESSAGE.voiceText || "Hello! Welcome to Vision One Access.", true);
-          }}
-          onToggleMute={() => {
-            if (!voiceSettings.isMuted) {
+      {/* Main Assistant View when open */}
+      {isOpen ? (
+        <main className="relative z-10 w-full h-full sm:h-[88vh] sm:max-h-[660px] sm:max-w-[380px] flex flex-col justify-center items-center">
+          <AssistantPanel
+            voiceState={voiceState}
+            messages={messages}
+            voiceSettings={voiceSettings}
+            micAmplitude={micAmplitude}
+            activePlayingText={activePlayingText}
+            suggestedQuestions={suggestedQuestions}
+            hasStarted={hasStarted}
+            liveTranscript={liveTranscript}
+            onReset={() => {
               speechSynthesisRef.current?.stop();
+              speechRecognitionRef.current?.stop();
               setVoiceState('idle');
-            }
-            setVoiceSettings((prev) => ({ ...prev, isMuted: !prev.isMuted }));
-          }}
-          onToggleMic={toggleMic}
-          onRetry={startListening}
-          onSelectQuestion={handleSelectQuestion}
-          onPlayVoice={(t) => speakVoice(t, true)}
-          onOpenCta={(type) => {
-            setLeadModalType(type);
-            setIsLeadModalOpen(true);
-          }}
-        />
-      </main>
+              setLiveTranscript('');
+              setMessages([INITIAL_WELCOME_MESSAGE]);
+              setSuggestedQuestions(INITIAL_WELCOME_MESSAGE.suggestedQuestions || []);
+              setIsAutoListening(true);
+            }}
+            onClose={handleCloseAssistant}
+            onToggleMute={() => {
+              if (!voiceSettings.isMuted) {
+                speechSynthesisRef.current?.stop();
+                setVoiceState('idle');
+              }
+              setVoiceSettings((prev) => ({ ...prev, isMuted: !prev.isMuted }));
+            }}
+            onToggleMic={toggleMic}
+            onRetry={startListening}
+            onSelectQuestion={handleSelectQuestion}
+            onPlayVoice={(t) => speakVoice(t, true)}
+            onOpenCta={(type) => {
+              setLeadModalType(type);
+              setIsLeadModalOpen(true);
+            }}
+          />
+        </main>
+      ) : (
+        /* Minimized State: Re-open launcher widget */
+        <div className="relative z-10 flex flex-col items-center justify-center p-6 text-center max-w-sm">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#111A3A] to-[#1D8DE6] flex items-center justify-center text-white shadow-xl shadow-[#1D8DE6]/20 mb-4 border border-white/40">
+            <Mic className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-lg font-bold font-['Sora'] text-[#111A3A]">VisionONE Access AI</h2>
+          <p className="text-xs text-[#111A3A]/70 font-['Inter'] mt-1 mb-5">
+            The voice assistant is currently closed. Tap below to re-open the voice conversation.
+          </p>
+          <button
+            onClick={handleOpenAssistant}
+            className="px-5 py-2.5 rounded-full bg-gradient-to-r from-[#111A3A] to-[#1D8DE6] text-white text-xs font-semibold font-['Sora'] shadow-md hover:shadow-lg active:scale-95 transition-all cursor-pointer flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4 text-[#35A6F7]" />
+            <span>Open Voice Assistant</span>
+          </button>
+        </div>
+      )}
+
+      {/* Persistent floating trigger badge if minimized on larger screen */}
+      {!isOpen && (
+        <div className="fixed bottom-5 right-5 z-50">
+          <button
+            onClick={handleOpenAssistant}
+            className="group flex items-center gap-3 px-4 py-3 rounded-full bg-gradient-to-r from-[#111A3A] to-[#1D8DE6] text-white shadow-2xl hover:shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer border border-white/20"
+            aria-label="Open VisionONE Voice Assistant"
+          >
+            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
+              <Mic className="w-4 h-4 text-white animate-pulse" />
+            </div>
+            <div className="text-left pr-1">
+              <span className="block text-xs font-bold font-['Sora'] leading-tight">VisionONE AI</span>
+              <span className="block text-[10px] text-[#E5F0FE] font-['Inter']">Tap to open voice</span>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Lead Capture Modal */}
       <LeadModal

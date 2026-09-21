@@ -8,6 +8,7 @@ interface VoiceOrbProps {
   amplitude?: number;
   onRetry?: () => void;
   onClick?: () => void;
+  hasStarted?: boolean;
 }
 
 export const VoiceOrb: React.FC<VoiceOrbProps> = ({
@@ -15,6 +16,7 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
   amplitude = 0,
   onRetry,
   onClick,
+  hasStarted = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -130,9 +132,9 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
   const getStateTitle = () => {
     switch (state) {
       case 'idle':
-        return 'Hands-Free Voice AI';
+        return !hasStarted ? 'Tap to Speak' : 'Hands-Free Voice AI';
       case 'listening':
-        return 'Listening automatically...';
+        return 'Listening... speak freely';
       case 'thinking':
         return 'Analyzing your question...';
       case 'speaking':
@@ -145,13 +147,15 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
   const getStateSubtext = () => {
     switch (state) {
       case 'idle':
-        return 'Hands-free mode active — speak anytime';
+        return !hasStarted
+          ? 'Tap orb to start • Then automatically speaks & listens'
+          : 'Hands-free mode active — speak anytime';
       case 'listening':
-        return 'Speak naturally without pressing any button';
+        return 'Pause when finished talking to get response';
       case 'thinking':
-        return 'Consulting enterprise knowledge...';
+        return 'Consulting VisionONE ERP intelligence...';
       case 'speaking':
-        return 'Speaking response (tap orb to pause or interrupt)';
+        return 'Listening will resume automatically when finished';
       case 'error':
         return 'Please allow microphone access in your browser';
     }

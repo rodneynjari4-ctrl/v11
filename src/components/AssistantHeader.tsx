@@ -1,17 +1,19 @@
 import React from 'react';
-import { Volume2, VolumeX, RotateCcw, ShieldCheck } from 'lucide-react';
+import { Volume2, VolumeX, RotateCcw, ShieldCheck, X } from 'lucide-react';
 import { VoiceSettings } from '../types';
 
 interface AssistantHeaderProps {
   onReset: () => void;
   voiceSettings: VoiceSettings;
   onToggleMute: () => void;
+  onClose?: () => void;
 }
 
 export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
   onReset,
   voiceSettings,
   onToggleMute,
+  onClose,
 }) => {
   return (
     <header
@@ -58,7 +60,7 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
       </div>
 
       {/* Action Controls */}
-      <div className="flex items-center gap-0.5 text-white/80">
+      <div className="flex items-center gap-1 text-white/80">
         <button
           onClick={onToggleMute}
           className="p-1.5 rounded-md hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
@@ -76,6 +78,17 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
+
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:text-white hover:bg-white/15 transition-colors cursor-pointer text-white/80 hover:text-white ml-0.5"
+            title="Close Assistant"
+            aria-label="Close Assistant"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </header>
   );

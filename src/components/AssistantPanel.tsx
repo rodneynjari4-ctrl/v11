@@ -11,7 +11,10 @@ interface AssistantPanelProps {
   micAmplitude: number;
   activePlayingText: string | null;
   suggestedQuestions: string[];
+  hasStarted?: boolean;
+  liveTranscript?: string;
   onReset: () => void;
+  onClose?: () => void;
   onToggleMute: () => void;
   onToggleMic: () => void;
   onRetry: () => void;
@@ -28,7 +31,10 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   micAmplitude,
   activePlayingText,
   suggestedQuestions,
+  hasStarted = false,
+  liveTranscript = '',
   onReset,
+  onClose,
   onToggleMute,
   onToggleMic,
   onRetry,
@@ -45,11 +51,12 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
       id="visionone-assistant-panel"
       className="relative flex flex-col w-full h-full bg-white rounded-none sm:rounded-2xl shadow-xl border-0 sm:border sm:border-slate-200/90 overflow-hidden transition-all duration-300 select-none text-[#111A3A]"
     >
-      {/* Universal Header */}
+      {/* Universal Header with Close Button */}
       <AssistantHeader
         onReset={onReset}
         voiceSettings={voiceSettings}
         onToggleMute={onToggleMute}
+        onClose={onClose}
       />
 
       {/* Sub-header status bar - Dedicated to Voice AI */}
@@ -60,7 +67,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
             Hands-Free Voice AI
           </span>
           <span className="text-[9px] font-medium px-1.5 py-0.2 rounded-sm bg-emerald-100 text-emerald-800">
-            Active
+            {!hasStarted ? 'Ready' : 'Active'}
           </span>
         </div>
 
@@ -73,7 +80,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
         </button>
       </div>
 
-      {/* Direct Voice View (No Landing/Selection Screen) */}
+      {/* Direct Voice View */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
         <VoiceModeView
           voiceState={voiceState}
@@ -82,6 +89,8 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
           lastUserMessage={lastUserMessage}
           suggestedQuestions={suggestedQuestions}
           activePlayingText={activePlayingText}
+          hasStarted={hasStarted}
+          liveTranscript={liveTranscript}
           onToggleMic={onToggleMic}
           onRetry={onRetry}
           onPlayVoice={onPlayVoice}
@@ -98,7 +107,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
           <span className="font-medium">VisionONE Voice Access</span>
         </span>
         <span className="text-[9px] text-[#111A3A]/50">
-          Hands-Free Continuous Voice
+          Continuous Automatic Turn-Taking
         </span>
       </footer>
     </div>

@@ -10,6 +10,8 @@ interface VoiceModeViewProps {
   lastUserMessage?: ChatMessage;
   suggestedQuestions: string[];
   activePlayingText: string | null;
+  hasStarted?: boolean;
+  liveTranscript?: string;
   onToggleMic: () => void;
   onRetry: () => void;
   onPlayVoice: (text: string) => void;
@@ -25,6 +27,8 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
   lastUserMessage,
   suggestedQuestions,
   activePlayingText,
+  hasStarted = false,
+  liveTranscript = '',
   onToggleMic,
   onRetry,
   onPlayVoice,
@@ -37,18 +41,33 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
   const isThinking = voiceState === 'thinking';
 
   const getStatusLabel = () => {
-    if (isListening) return 'Listening continuously... speak freely';
+    if (!hasStarted && voiceState === 'idle') {
+      return 'Tap the microphone or orb to begin speaking';
+    }
+    if (isListening) {
+      return liveTranscript
+        ? 'Hearing your voice... pause when finished'
+        : 'Listening... speak freely';
+    }
     if (isThinking) return 'Analyzing question and preparing response...';
-    if (isSpeaking) return 'Speaking response aloud (tap to pause)';
+    if (isSpeaking) return 'Speaking response aloud (tap to interrupt)';
     return 'Hands-free mode active — speak anytime';
   };
 
   const getStatusBadge = () => {
+    if (!hasStarted && voiceState === 'idle') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E5F0FE] border border-[#1D8DE6]/40 text-[#1D8DE6] text-xs font-semibold shadow-2xs">
+          <Sparkles className="w-3.5 h-3.5 text-[#1D8DE6]" />
+          Tap to Speak to Start
+        </span>
+      );
+    }
     if (isListening) {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-700 text-xs font-semibold animate-pulse">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-          Listening Automatically (Hands-Free)
+          Listening (Pause to Answer)
         </span>
       );
     }
@@ -96,11 +115,30 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
           amplitude={micAmplitude}
           onRetry={onRetry}
           onClick={onToggleMic}
+          hasStarted={hasStarted}
         />
 
-        {/* Live Conversation Transcript Card (Shows latest query and response) */}
+        {/* Live Conversation Transcript Card */}
         <div className="w-full max-w-sm mt-3 space-y-2">
-          {lastUserMessage && (
+          {/* Live speech feedback while user is actively talking */}
+          {liveTranscript && isListening && (
+            <div className="bg-[#E5F0FE] border border-[#1D8DE6]/40 rounded-xl p-2.5 text-xs text-[#111A3A] flex flex-col gap-1 shadow-xs animate-pulse">
+              <div className="flex items-center justify-between text-[10px] text-[#1D8DE6] font-semibold font-['Sora']">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  Hearing you:
+                </span>
+                <span className="text-[9px] text-[#111A3A]/60 font-normal font-['Inter']">
+                  Pause when finished
+                </span>
+              </div>
+              <p className="font-['Inter'] font-medium text-[#111A3A] italic leading-snug">
+                "{liveTranscript}"
+              </p>
+            </div>
+          )}
+
+          {lastUserMessage && !liveTranscript && (
             <div className="bg-[#1D8DE6]/10 border border-[#1D8DE6]/20 rounded-xl px-3 py-1.5 text-xs text-[#111A3A] flex items-center justify-between">
               <span className="text-[10px] font-semibold text-[#1D8DE6] uppercase tracking-wider font-['Sora'] mr-2 shrink-0">
                 You asked:
@@ -133,7 +171,7 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
               {lastAssistantMessage.cta && (
                 <button
                   onClick={() => onOpenCta(lastAssistantMessage.cta!.type)}
-                  className="w-full mt-1.5 py-1.5 px-3 rounded-lg bg-[#111A3A] hover:bg-[#1D8DE6] text-white text-xs font-semibold flex items-center justify-center gap-1 transition shadow-xs"
+                  className="w-full mt-1.5 py-1.5 px-3 rounded-lg bg-[#111A3A] hover:bg-[#1D8DE6] text-white text-xs font-semibold flex items-center justify-center gap-1 transition shadow-xs cursor-pointer"
                 >
                   <span>{lastAssistantMessage.cta.label}</span>
                   <ArrowRight className="w-3 h-3" />
@@ -145,16 +183,26 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
       </div>
 
       {/* Primary Voice Controls (Status & Quick Topic Chips) */}
-      <div className="w-full flex flex-col items-center gap-2.5 pt-2 shrink-0">
-        <div className="flex items-center gap-3">
-          {/* Hands-free Toggle / Interrupt Button */}
+      <div className="w-full flex flex-col items-center gap-2 pt-1 shrink-0">
+        <div className="flex flex-col items-center gap-1">
+          {/* Hands-free Toggle / Start Mic Button */}
           <button
             type="button"
             onClick={onToggleMic}
             disabled={micDisabled || isThinking}
-            aria-label={isListening ? 'Pause listening' : isSpeaking ? 'Interrupt speaking' : 'Resume listening'}
+            aria-label={
+              !hasStarted
+                ? 'Tap to speak'
+                : isListening
+                ? 'Pause listening'
+                : isSpeaking
+                ? 'Interrupt speaking'
+                : 'Resume listening'
+            }
             className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 cursor-pointer active:scale-95 focus:outline-none focus:ring-4 ${
-              isListening
+              !hasStarted && voiceState === 'idle'
+                ? 'bg-gradient-to-tr from-[#111A3A] via-[#1D8DE6] to-[#35A6F7] text-white shadow-[#1D8DE6]/40 ring-4 ring-[#1D8DE6]/30 hover:scale-105 animate-pulse'
+                : isListening
                 ? 'bg-emerald-600 text-white shadow-emerald-600/40 ring-emerald-300 animate-pulse'
                 : isSpeaking
                 ? 'bg-[#111A3A] text-white shadow-[#111A3A]/30 ring-[#1D8DE6]/40 hover:bg-[#1D8DE6]'
@@ -168,16 +216,28 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
             ) : isSpeaking ? (
               <Square className="w-5 h-5 fill-current" />
             ) : (
-              <Play className="w-6 h-6 sm:w-7 sm:h-7 fill-current ml-0.5" />
+              <Mic className="w-6 h-6 sm:w-7 sm:h-7" />
             )}
           </button>
+
+          <span className="text-[10px] font-semibold text-[#111A3A]/70 font-['Sora'] tracking-tight">
+            {!hasStarted && voiceState === 'idle'
+              ? 'Tap to Speak'
+              : isListening
+              ? 'Listening...'
+              : isSpeaking
+              ? 'Tap to Pause'
+              : isThinking
+              ? 'Thinking...'
+              : 'Tap to Speak'}
+          </span>
         </div>
 
         {/* Quick Voice Topics (Tap any to speak question aloud instantly) */}
         {suggestedQuestions.length > 0 && (
-          <div className="w-full flex flex-col items-center gap-1">
+          <div className="w-full flex flex-col items-center gap-1 mt-1">
             <span className="text-[10px] text-[#111A3A]/60 font-['Inter']">
-              Or tap any topic to ask aloud:
+              Or tap any topic to ask:
             </span>
             <div className="w-full flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 justify-start sm:justify-center">
               {suggestedQuestions.slice(0, 3).map((q, idx) => (

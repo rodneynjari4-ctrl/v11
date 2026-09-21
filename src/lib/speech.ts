@@ -215,7 +215,7 @@ export class SpeechRecognitionManager {
 
     try {
       this.recognition = new SpeechRecognitionClass();
-      this.recognition.continuous = false;
+      this.recognition.continuous = true;
       this.recognition.interimResults = true;
       this.recognition.lang = 'en-US';
 
@@ -227,18 +227,19 @@ export class SpeechRecognitionManager {
       };
 
       this.recognition.onresult = (event: any) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
+        let accumulatedFinal = '';
+        let interimText = '';
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
+        for (let i = 0; i < event.results.length; ++i) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            accumulatedFinal += res[0].transcript + ' ';
           } else {
-            interimTranscript += event.results[i][0].transcript;
+            interimText += res[0].transcript;
           }
         }
 
-        const currentText = (finalTranscript || interimTranscript).trim();
+        const currentText = (accumulatedFinal + interimText).trim();
         if (currentText) {
           this.lastTranscript = currentText;
         }
@@ -248,22 +249,20 @@ export class SpeechRecognitionManager {
           this.silenceTimer = null;
         }
 
-        if (finalTranscript && currentText && !this.isSubmitted) {
-          this.isSubmitted = true;
-          this.shouldBeListening = false;
-          this.onResultCallback?.(currentText, true);
-        } else if (currentText) {
+        if (currentText) {
+          // Send interim live feedback to UI so user sees they are being heard
           this.onResultCallback?.(currentText, false);
 
-          // Auto-finalize on natural speech pause (1.2s of silence)
+          // Voice Activity Detection: 1.35 seconds of silence clearly distinguishes when user is finished talking
           this.silenceTimer = setTimeout(() => {
             if (!this.isSubmitted && this.lastTranscript.trim()) {
               this.isSubmitted = true;
               this.shouldBeListening = false;
-              this.onResultCallback?.(this.lastTranscript.trim(), true);
+              const completedText = this.lastTranscript.trim();
+              this.onResultCallback?.(completedText, true);
               this.stop();
             }
-          }, 1200);
+          }, 1350);
         }
       };
 
