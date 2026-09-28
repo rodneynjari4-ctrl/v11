@@ -491,13 +491,19 @@ export default function App() {
   };
 
   return (
-    <div className="w-full h-[100dvh] bg-slate-100 text-[#111A3A] relative flex items-center justify-center p-0 sm:p-4 overflow-hidden">
-      {/* Subtle clean neutral backdrop */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200/70 pointer-events-none" />
+    <div
+      className={`w-full h-[100dvh] relative flex items-center justify-center p-0 sm:p-4 overflow-hidden transition-colors duration-300 ${
+        isOpen ? 'bg-slate-100 text-[#111A3A]' : 'bg-transparent pointer-events-none'
+      }`}
+    >
+      {/* Subtle clean neutral backdrop when open */}
+      {isOpen && (
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200/70 pointer-events-none" />
+      )}
 
       {/* Main Assistant View when open */}
-      {isOpen ? (
-        <main className="relative z-10 w-full h-full sm:h-[88vh] sm:max-h-[660px] sm:max-w-[380px] flex flex-col justify-center items-center">
+      {isOpen && (
+        <main className="relative z-10 w-full h-full sm:h-[88vh] sm:max-h-[660px] sm:max-w-[380px] flex flex-col justify-center items-center pointer-events-auto">
           <AssistantPanel
             voiceState={voiceState}
             messages={messages}
@@ -530,29 +536,11 @@ export default function App() {
             }}
           />
         </main>
-      ) : (
-        /* Minimized State: Re-open launcher widget */
-        <div className="relative z-10 flex flex-col items-center justify-center p-6 text-center max-w-sm">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#111A3A] to-[#1D8DE6] flex items-center justify-center text-white shadow-xl shadow-[#1D8DE6]/20 mb-4 border border-white/40">
-            <Mic className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-lg font-bold font-['Sora'] text-[#111A3A]">VisionONE Access AI</h2>
-          <p className="text-xs text-[#111A3A]/70 font-['Inter'] mt-1 mb-5">
-            The voice assistant is currently closed. Tap below to re-open the voice conversation.
-          </p>
-          <button
-            onClick={handleOpenAssistant}
-            className="px-5 py-2.5 rounded-full bg-gradient-to-r from-[#111A3A] to-[#1D8DE6] text-white text-xs font-semibold font-['Sora'] shadow-md hover:shadow-lg active:scale-95 transition-all cursor-pointer flex items-center gap-2"
-          >
-            <Sparkles className="w-4 h-4 text-[#35A6F7]" />
-            <span>Open Voice Assistant</span>
-          </button>
-        </div>
       )}
 
-      {/* Persistent floating trigger badge if minimized on larger screen */}
+      {/* Persistent discreet floating launcher button when closed */}
       {!isOpen && (
-        <div className="fixed bottom-5 right-5 z-50">
+        <div className="fixed bottom-5 right-5 z-50 pointer-events-auto">
           <button
             onClick={handleOpenAssistant}
             className="group flex items-center gap-3 px-4 py-3 rounded-full bg-gradient-to-r from-[#111A3A] to-[#1D8DE6] text-white shadow-2xl hover:shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer border border-white/20"

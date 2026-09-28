@@ -166,7 +166,7 @@ LEAD QUALIFICATION & SALES INTENT:
 
 Always return a valid JSON object strictly matching the schema.`;
 
-// Helper to identify if user is ending or concluding the conversation
+// Helper to identify if user is genuinely and intuitively ending or concluding the conversation
 function isConversationEndingIntent(message: string): boolean {
   const clean = (message || "")
     .toLowerCase()
@@ -185,11 +185,9 @@ function isConversationEndingIntent(message: string): boolean {
     "that is all",
     "no more questions",
     "no more question",
-    "no more",
     "nothing else",
     "exit",
     "quit",
-    "stop",
     "close",
     "close widget",
     "no thats it",
@@ -210,11 +208,16 @@ function isConversationEndingIntent(message: string): boolean {
     "no thank you thats all",
     "im finished",
     "i am finished",
-    "nothing more",
     "no more help needed",
     "no further questions",
     "i have no more questions",
     "done for now",
+    "thats all thank you",
+    "that is all thank you",
+    "thats everything thank you",
+    "that is everything thank you",
+    "thank you bye",
+    "thanks bye",
   ];
 
   if (
@@ -229,10 +232,6 @@ function isConversationEndingIntent(message: string): boolean {
     return true;
   }
 
-  if (["no", "nope", "nah", "nothing", "none", "no thanks", "no thank you"].includes(clean)) {
-    return true;
-  }
-
   return false;
 }
 
@@ -240,15 +239,13 @@ const CRITIC_SYSTEM_INSTRUCTION = `You are the Senior QA & Quality Critic Agent 
 Your responsibility is to strictly review and critique candidate AI responses to achieve a high QA score (target: 95-100%).
 
 CRITERIA FOR QA EVALUATION:
-1. Domain Accuracy & Truthfulness:
+1. Stay Active & Intuitive Conversation Closure:
+   - The assistant MUST stay active, awake, and listening throughout normal questions, follow-ups, and natural conversational pauses.
+   - ONLY conclude the conversation (set "isConversationOver" to true) when the user genuinely and intuitively indicates they have finished their conversation (e.g., saying goodbye, expressing they are all done, or wrapping up: "bye", "goodbye", "I'm all done", "that will be all thank you", "no more questions", "have a great day").
+   - If the user is answering a question, clarifying, asking another question, saying "no" to an option, or pausing, the conversation is NOT over (set "isConversationOver" to false).
+2. Domain Accuracy & Truthfulness:
    - Does the response accurately represent VisionONE ERP (Finance & Accounting, HR & Payroll, Inventory & Procurement, KRA eTIMS, M-PESA)?
    - Reject any fabricated pricing numbers, unsupported specs, or false guarantees.
-2. Conversation Closure Detection:
-   - Carefully check the user's latest message and recent context.
-   - If the user indicates they are done ("I'm done", "no more questions", "that's all", "bye", "goodbye", "thanks I'm good", "exit", "nothing else", "no that's it", "have a nice day"):
-     * MUST set "isConversationOver" to true.
-     * The response MUST be a gracious, polite closing farewell acknowledging the conclusion of the conversation.
-   - Otherwise, set "isConversationOver" to false.
 3. Voice Naturalness & Phonetic Strictness:
    - The "improvedVoiceText" is read aloud by neural speech synthesis.
    - It MUST strictly adhere to spoken phonetic rules:

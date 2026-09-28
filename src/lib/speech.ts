@@ -135,12 +135,12 @@ export class SpeechRecognitionManager {
     if (this.watchdogTimer) {
       clearInterval(this.watchdogTimer);
     }
-    // Check every 2.5 seconds: if hands-free listening is intended but inactive, revive immediately!
+    // Check every 1.5 seconds: if hands-free listening is intended but inactive, revive immediately!
     this.watchdogTimer = setInterval(() => {
       if (this.shouldBeListening && !this.isSpeakingOrThinking && !this.isListening) {
         this.safeStartRecognition();
       }
-    }, 2500);
+    }, 1500);
   }
 
   private createRecognitionInstance(): any {
@@ -191,7 +191,7 @@ export class SpeechRecognitionManager {
             this.silenceTimer = null;
           }
 
-          // Hands-free natural silence detector: 1.1s of silence auto-submits hands-free!
+          // Hands-free natural silence detector: 1.5s of silence auto-submits hands-free!
           this.silenceTimer = setTimeout(() => {
             if (!this.isSubmitted && this.lastTranscript.trim() && !this.isSpeakingOrThinking) {
               this.isSubmitted = true;
@@ -199,7 +199,7 @@ export class SpeechRecognitionManager {
               this.pauseListeningForAgentTurn();
               this.onResultCallback?.(textToSend, true);
             }
-          }, 1100);
+          }, 1500);
         }
       };
 
@@ -364,7 +364,21 @@ export class SpeechRecognitionManager {
     this.shouldBeListening = true;
     this.isSubmitted = false;
     this.lastTranscript = '';
-    this.safeStartRecognition();
+    try {
+      this.recognition?.abort();
+    } catch {}
+    this.recognition = this.createRecognitionInstance();
+    try {
+      this.recognition?.start();
+    } catch {
+      setTimeout(() => {
+        if (this.shouldBeListening && !this.isSpeakingOrThinking) {
+          try {
+            this.recognition?.start();
+          } catch {}
+        }
+      }, 50);
+    }
   }
 
   public start(
