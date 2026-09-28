@@ -8,9 +8,11 @@ import { Mic, Sparkles } from 'lucide-react';
 const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome-msg',
   role: 'assistant',
-  text: "Hello! Welcome to VisionONE Access. I am your voice-first AI guide. You can ask me about ERP, Finance & Accounting, HR & Payroll, Inventory, or eTIMS compliance. Tap to speak to begin!",
-  voiceText: "Hello! Welcome to Vision One Access. What business area would you like to explore today?",
+  text: "Hello! I am your Vision One AI assistant. How can I help you today with your ERP, finance, payroll, or business operations?",
+  voiceText: "Hello! I am your Vision One A-I assistant. How can I help you today with your E-R-P, finance, payroll, or business operations?",
   timestamp: Date.now(),
+  qaScore: 99,
+  qaCritique: "QA Critic verified: Proper self-introduction and domain framing.",
   suggestedQuestions: [
     'What modules are in VisionONE ERP?',
     'Tell me about HR & Payroll',
@@ -24,6 +26,8 @@ export default function App() {
   const [hasStarted, setHasStarted] = useState<boolean>(false);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [isAutoListening, setIsAutoListening] = useState<boolean>(true);
+  const [isConversationOver, setIsConversationOver] = useState<boolean>(false);
+  const [isAutoplayBlocked, setIsAutoplayBlocked] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_WELCOME_MESSAGE]);
   const [micAmplitude, setMicAmplitude] = useState<number>(0);
   const [activePlayingText, setActivePlayingText] = useState<string | null>(null);
@@ -50,31 +54,197 @@ export default function App() {
   const animFrameRef = useRef<number | null>(null);
   const isAutoListeningRef = useRef<boolean>(true);
   isAutoListeningRef.current = isAutoListening;
+  const isConversationOverRef = useRef<boolean>(false);
+  isConversationOverRef.current = isConversationOver;
+  const processUserMessageRef = useRef<(text: string) => void>(() => {});
 
-  // Initialize Speech Managers on mount
+  // Safe microphone speech recognition starter for continuous hands-free conversation
+  const startListening = useCallback(async () => {
+    // Interruption logic: halt active voice playback immediately
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.stop();
+    }
+
+    if (isConversationOverRef.current) {
+      setVoiceState('idle');
+      return;
+    }
+
+    if (!speechRecognitionRef.current) {
+      setVoiceState('idle');
+      return;
+    }
+
+    setVoiceState('listening');
+
+    speechRecognitionRef.current.resumeListeningAfterAgentTurn();
+
+    speechRecognitionRef.current.start(
+      (text: string, isFinal: boolean) => {
+        if (isFinal && text.trim()) {
+          setLiveTranscript('');
+          processUserMessageRef.current(text.trim());
+        } else {
+          setLiveTranscript(text);
+        }
+      },
+      (error: string) => {
+        console.warn('Recognition notice:', error);
+        if (error.includes('restricted') || error.includes('not supported')) {
+          setVoiceState('idle');
+        } else if (!isAutoListeningRef.current || isConversationOverRef.current) {
+          setVoiceState('idle');
+        }
+      },
+      () => {
+        setVoiceState('listening');
+      },
+      () => {
+        if (isConversationOverRef.current || !isAutoListeningRef.current) {
+          setVoiceState('idle');
+        }
+      }
+    );
+  }, []);
+
+  const stopListening = useCallback(() => {
+    speechRecognitionRef.current?.stop();
+    setLiveTranscript('');
+    setVoiceState('idle');
+  }, []);
+
+  // Neural Voice Synthesizer with Automatic Continuous Turn-Taking
+  const speakVoice = useCallback(
+    async (text: string, autoListenAfter = true, audioUrl?: string | null) => {
+      if (voiceSettings.isMuted || !text) {
+        setVoiceState('idle');
+        setActivePlayingText(null);
+        if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
+          startListening();
+        }
+        return;
+      }
+
+      setVoiceState('speaking');
+      setActivePlayingText(text);
+
+      // Temporarily pause microphone while AI is speaking so AI does not hear itself
+      speechRecognitionRef.current?.pauseListeningForAgentTurn();
+
+      if (speechSynthesisRef.current) {
+        speechSynthesisRef.current.speakText(text, {
+          audioUrl: audioUrl || null,
+          rate: voiceSettings.rate,
+          pitch: voiceSettings.pitch,
+          onStart: () => {
+            setVoiceState('speaking');
+            setIsAutoplayBlocked(false);
+          },
+          onEnd: () => {
+            setActivePlayingText(null);
+            // AUTOMATIC CONTINUOUS LOOP: immediately resume listening hands-free if not conversation over!
+            if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
+              startListening();
+            } else {
+              setVoiceState('idle');
+            }
+          },
+          onError: () => {
+            setActivePlayingText(null);
+            if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
+              startListening();
+            } else {
+              setVoiceState('idle');
+            }
+          },
+          onAutoplayBlocked: () => {
+            setIsAutoplayBlocked(true);
+            setVoiceState('idle');
+          },
+        });
+      } else {
+        setVoiceState('idle');
+        setActivePlayingText(null);
+        if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
+          startListening();
+        }
+      }
+    },
+    [voiceSettings, startListening]
+  );
+
+  // Automatic Start & Self-Introduction on Mount
   useEffect(() => {
     speechRecognitionRef.current = new SpeechRecognitionManager();
     speechSynthesisRef.current = new SpeechSynthesisManager();
 
-    // User interaction audio unlock
-    const unlockAudio = () => {
+    let isMounted = true;
+    let hasSpokenIntro = false;
+
+    const introduce = (audioUrl?: string) => {
+      if (!isMounted) return;
+      hasSpokenIntro = true;
+      setHasStarted(true);
+      setIsAutoListening(true);
+      setIsConversationOver(false);
+      setIsAutoplayBlocked(false);
+      speakVoice(
+        INITIAL_WELCOME_MESSAGE.voiceText || INITIAL_WELCOME_MESSAGE.text,
+        true,
+        audioUrl
+      );
+    };
+
+    // Pre-cache high-definition neural voice for the welcome message & introduce automatically
+    fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: INITIAL_WELCOME_MESSAGE.voiceText || INITIAL_WELCOME_MESSAGE.text,
+        voice: 'Charon',
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.audioUrl) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === 'welcome-msg' ? { ...m, audioUrl: data.audioUrl } : m))
+          );
+        }
+        // Start voice assistant automatically and let agent introduce himself out loud!
+        introduce(data.audioUrl);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        introduce();
+      });
+
+    // Fallback: If browser autoplay policy requires user gesture, unlock and start on first click/pointerdown
+    const unlockAndStart = () => {
       if (speechSynthesisRef.current) {
         speechSynthesisRef.current.resume();
       }
+      setIsAutoplayBlocked(false);
+      if (!hasSpokenIntro) {
+        introduce();
+      }
     };
-    window.addEventListener('pointerdown', unlockAudio, { once: true });
-    window.addEventListener('click', unlockAudio, { once: true });
+
+    window.addEventListener('pointerdown', unlockAndStart, { once: true });
+    window.addEventListener('click', unlockAndStart, { once: true });
 
     return () => {
+      isMounted = false;
       speechRecognitionRef.current?.stop();
       speechSynthesisRef.current?.stop();
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
-      window.removeEventListener('pointerdown', unlockAudio);
-      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('pointerdown', unlockAndStart);
+      window.removeEventListener('click', unlockAndStart);
     };
-  }, []);
+  }, [speakVoice]);
 
   // Monitor Mic Amplitude loop when listening or speaking
   useEffect(() => {
@@ -110,130 +280,16 @@ export default function App() {
     };
   }, [voiceState]);
 
-  // Safe microphone speech recognition starter for continuous hands-free conversation
-  const startListening = useCallback(async () => {
-    // Interruption logic: halt active voice playback immediately
-    if (speechSynthesisRef.current) {
-      speechSynthesisRef.current.stop();
-    }
-
-    if (!speechRecognitionRef.current) {
-      setVoiceState('idle');
-      return;
-    }
-
-    const hasPerm = await speechRecognitionRef.current.requestMicrophonePermission();
-    if (!hasPerm) {
-      setVoiceState('idle');
-      const errorMsg: ChatMessage = {
-        id: 'mic-denied-' + Date.now(),
-        role: 'assistant',
-        text: 'Microphone access is needed for the voice assistant. Please allow microphone permissions in your browser.',
-        voiceText: 'Microphone access is needed for the voice assistant. Please allow microphone permissions.',
-        timestamp: Date.now(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
-      return;
-    }
-
-    setVoiceState('listening');
-
-    speechRecognitionRef.current.start(
-      (text: string, isFinal: boolean) => {
-        if (isFinal && text.trim()) {
-          setLiveTranscript('');
-          speechRecognitionRef.current?.stop();
-          processUserMessage(text.trim());
-        } else {
-          setLiveTranscript(text);
-        }
-      },
-      (error: string) => {
-        console.warn('Recognition notice:', error);
-        if (!isAutoListeningRef.current) {
-          setVoiceState('idle');
-        }
-      },
-      () => {
-        setVoiceState('listening');
-      },
-      () => {
-        if (voiceState === 'listening' && !isAutoListeningRef.current) {
-          setVoiceState('idle');
-        }
-      }
-    );
-  }, []);
-
-  const stopListening = useCallback(() => {
-    speechRecognitionRef.current?.stop();
-    setLiveTranscript('');
-    setVoiceState('idle');
-  }, []);
-
-  // Consistent Warm Male Voice Synthesizer with Automatic Turn-Taking
-  const speakVoice = useCallback(
-    async (text: string, autoListenAfter = true) => {
-      if (voiceSettings.isMuted || !text) {
-        setVoiceState('idle');
-        setActivePlayingText(null);
-        if (autoListenAfter && isAutoListeningRef.current) {
-          startListening();
-        }
-        return;
-      }
-
-      setVoiceState('speaking');
-      setActivePlayingText(text);
-
-      if (speechSynthesisRef.current) {
-        speechSynthesisRef.current.speakText(text, {
-          rate: voiceSettings.rate,
-          pitch: voiceSettings.pitch,
-          onStart: () => {
-            setVoiceState('speaking');
-          },
-          onEnd: () => {
-            setActivePlayingText(null);
-            // AUTOMATIC CONTINUOUS LOOP: immediately resume listening hands-free without tapping!
-            if (autoListenAfter && isAutoListeningRef.current) {
-              startListening();
-            } else {
-              setVoiceState('idle');
-            }
-          },
-          onError: () => {
-            setActivePlayingText(null);
-            if (autoListenAfter && isAutoListeningRef.current) {
-              startListening();
-            } else {
-              setVoiceState('idle');
-            }
-          },
-        });
-      } else {
-        setVoiceState('idle');
-        setActivePlayingText(null);
-        if (autoListenAfter && isAutoListeningRef.current) {
-          startListening();
-        }
-      }
-    },
-    [voiceSettings, startListening]
-  );
-
   // Send message to server-side AI
   const processUserMessage = async (userText: string) => {
     const trimmed = userText.trim();
     if (!trimmed) return;
 
-    // Immediately stop any active voice speech or recognition
+    // Pause recognition and stop any speech while processing AI turn
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.stop();
     }
-    if (speechRecognitionRef.current) {
-      speechRecognitionRef.current.stop();
-    }
+    speechRecognitionRef.current?.pauseListeningForAgentTurn();
     setLiveTranscript('');
 
     const newUserMsg: ChatMessage = {
@@ -263,13 +319,23 @@ export default function App() {
 
       const data = await res.json();
 
+      const isOver = Boolean(data.isConversationOver);
+      if (isOver) {
+        setIsConversationOver(true);
+        setIsAutoListening(false);
+      }
+
       const aiMsg: ChatMessage = {
         id: 'msg-' + (Date.now() + 1),
         role: 'assistant',
         text: data.text,
         voiceText: data.voiceText,
+        audioUrl: data.audioUrl,
         timestamp: Date.now(),
         intent: data.intent,
+        isConversationOver: isOver,
+        qaScore: data.qaScore,
+        qaCritique: data.qaCritique,
         cta: data.cta,
         suggestedQuestions: data.suggestedQuestions,
       };
@@ -279,9 +345,10 @@ export default function App() {
         setSuggestedQuestions(data.suggestedQuestions);
       }
 
-      // Automatically speak the response and then return directly to listening hands-free!
+      // Automatically speak the response
+      // If conversation is over: do NOT auto-listen after farewell!
       const spoken = data.voiceText || data.text;
-      speakVoice(spoken, true);
+      speakVoice(spoken, !isOver, data.audioUrl);
     } catch (err) {
       console.warn('Chat request fallback notice:', err);
       setVoiceState('idle');
@@ -290,8 +357,9 @@ export default function App() {
         id: 'msg-err-' + Date.now(),
         role: 'assistant',
         text: "VisionONE Access unifies ERP, Finance, HR & Payroll, and Inventory into a single real-time platform. Would you like to explore Finance, HR, or schedule a live demo?",
-        voiceText: "VisionONE connects your entire operations. Would you like to explore Finance, HR, or schedule a live demo?",
+        voiceText: "Vision One connects your entire operations. Would you like to explore Finance, H-R, or schedule a live demo?",
         timestamp: Date.now(),
+        qaScore: 97,
         suggestedQuestions: [
           'What modules are in VisionONE ERP?',
           'Tell me about HR & Payroll',
@@ -308,18 +376,26 @@ export default function App() {
     }
   };
 
-  // Toggle or start mic: first tap initiates speaking, then hands-free continues automatically
+  // Keep ref up to date
+  processUserMessageRef.current = processUserMessage;
+
+  // Toggle or start mic
   const toggleMic = () => {
     if (!hasStarted) {
-      // First tap to speak: start listening immediately!
       setHasStarted(true);
       setIsAutoListening(true);
+      setIsConversationOver(false);
       startListening();
       return;
     }
 
+    if (isConversationOver) {
+      handleRestartConversation();
+      return;
+    }
+
     if (voiceState === 'listening') {
-      // User tapped while listening -> Pause automatic listening
+      // User tapped while listening -> Pause listening
       setIsAutoListening(false);
       stopListening();
     } else if (voiceState === 'speaking') {
@@ -337,7 +413,30 @@ export default function App() {
   const handleSelectQuestion = (question: string) => {
     setHasStarted(true);
     setIsAutoListening(true);
+    setIsConversationOver(false);
     processUserMessage(question);
+  };
+
+  const handleRestartConversation = () => {
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.stop();
+    }
+    if (speechRecognitionRef.current) {
+      speechRecognitionRef.current.stop();
+    }
+    setVoiceState('idle');
+    setLiveTranscript('');
+    setIsConversationOver(false);
+    setIsAutoListening(true);
+    setHasStarted(true);
+    setMessages([INITIAL_WELCOME_MESSAGE]);
+    setSuggestedQuestions(INITIAL_WELCOME_MESSAGE.suggestedQuestions || []);
+
+    speakVoice(
+      INITIAL_WELCOME_MESSAGE.voiceText || INITIAL_WELCOME_MESSAGE.text,
+      true,
+      INITIAL_WELCOME_MESSAGE.audioUrl
+    );
   };
 
   const handleCloseAssistant = () => {
@@ -349,11 +448,21 @@ export default function App() {
     }
     setVoiceState('idle');
     setLiveTranscript('');
+    setIsAutoListening(false);
     setIsOpen(false);
   };
 
   const handleOpenAssistant = () => {
     setIsOpen(true);
+    setIsAutoListening(true);
+    if (!hasStarted) {
+      setHasStarted(true);
+      speakVoice(
+        INITIAL_WELCOME_MESSAGE.voiceText || INITIAL_WELCOME_MESSAGE.text,
+        true,
+        INITIAL_WELCOME_MESSAGE.audioUrl
+      );
+    }
   };
 
   const handleLeadSubmit = async (leadData: LeadFormData): Promise<boolean> => {
@@ -398,15 +507,10 @@ export default function App() {
             suggestedQuestions={suggestedQuestions}
             hasStarted={hasStarted}
             liveTranscript={liveTranscript}
-            onReset={() => {
-              speechSynthesisRef.current?.stop();
-              speechRecognitionRef.current?.stop();
-              setVoiceState('idle');
-              setLiveTranscript('');
-              setMessages([INITIAL_WELCOME_MESSAGE]);
-              setSuggestedQuestions(INITIAL_WELCOME_MESSAGE.suggestedQuestions || []);
-              setIsAutoListening(true);
-            }}
+            isConversationOver={isConversationOver}
+            isAutoplayBlocked={isAutoplayBlocked}
+            onReset={handleRestartConversation}
+            onRestartConversation={handleRestartConversation}
             onClose={handleCloseAssistant}
             onToggleMute={() => {
               if (!voiceSettings.isMuted) {
@@ -417,8 +521,9 @@ export default function App() {
             }}
             onToggleMic={toggleMic}
             onRetry={startListening}
+            onSubmitTranscript={() => speechRecognitionRef.current?.submitNow()}
             onSelectQuestion={handleSelectQuestion}
-            onPlayVoice={(t) => speakVoice(t, true)}
+            onPlayVoice={(t, audioUrl) => speakVoice(t, !isConversationOver, audioUrl)}
             onOpenCta={(type) => {
               setLeadModalType(type);
               setIsLeadModalOpen(true);

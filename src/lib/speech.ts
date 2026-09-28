@@ -1,7 +1,7 @@
 /**
- * Speech Recognition and Speech Synthesis utilities for VisionONE Access AI
- * Configured specifically for a reliable, warm male voice experience
- * and fully safe for iframe / WordPress embeds.
+ * Speech Recognition and High-Definition Neural Speech Synthesis for VisionONE Access AI
+ * Features server-side Gemini 3.1 Flash Neural TTS (ultra-realistic human voice)
+ * with robust browser speech fallback and fail-safe watchdog timers.
  */
 
 interface IWindow extends Window {
@@ -25,7 +25,7 @@ export function isSecureContextOrLocal(): boolean {
   return window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 }
 
-// Known female voice identifiers to strictly filter out
+// Known female voice identifiers to strictly filter out for browser fallback
 const FEMALE_VOICE_PATTERNS = [
   'female', 'samantha', 'karen', 'jenny', 'victoria', 'zira', 'susan', 'cynthia',
   'moira', 'fiona', 'tessa', 'stephanie', 'hazel', 'aria', 'ava', 'allison',
@@ -36,43 +36,27 @@ const FEMALE_VOICE_PATTERNS = [
   'zoe', 'zuzana', 'lucy', 'sonia', 'natasha', 'katja', 'evelyn', 'dora', 'chiara'
 ];
 
-// Preferred warm, high-fidelity natural/neural male voice rank order across platforms
+// Preferred warm, natural male browser voices
 const WARM_MALE_VOICE_PRIORITY = [
-  // Edge / Windows Neural Online Voices (Remarkably human & fluid)
   'microsoft guy online (natural)',
   'microsoft christopher online (natural)',
   'microsoft ryan online (natural)',
   'microsoft andrew online (natural)',
   'microsoft brian online (natural)',
-  'microsoft steffan online (natural)',
-  // Apple macOS & iOS Enhanced Neural Voices
   'daniel (enhanced)',
   'oliver (enhanced)',
   'evan (enhanced)',
-  'nathan (enhanced)',
-  'jamie (enhanced)',
-  'tom (enhanced)',
-  // Chrome / Android High-Quality Voices
   'google us english',
   'google uk english male',
-  'google english (united states)',
-  // High quality standard platform male voices
-  'daniel', // macOS/iOS warm UK male
-  'alex',   // macOS warm natural male
-  'oliver',
-  'arthur',
+  'daniel',
+  'alex',
   'microsoft david',
-  'microsoft mark',
-  'microsoft george',
-  'fred',
-  'aaron',
-  'nathan'
+  'fred'
 ];
 
 /**
- * Normalizes text specifically for speech synthesis engines so that
- * acronyms, business terms, tax compliance names, and currency sound completely
- * naturalistic and are pronounced with proper human diction.
+ * Normalizes text specifically for speech so that acronyms, business terms,
+ * and currency sound completely naturalistic and authentic.
  */
 export function normalizeTextForNaturalSpeech(rawText: string): string {
   if (!rawText) return '';
@@ -80,16 +64,16 @@ export function normalizeTextForNaturalSpeech(rawText: string): string {
   let text = rawText;
 
   // 1. Remove markdown formatting, asterisks, hashes, backticks, brackets
-  text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1'); // markdown links -> title text
-  text = text.replace(/[*_#`~>]/g, ' '); // markdown emphasis & headers
-  text = text.replace(/\{[^}]+\}/g, ' '); // json or code braces
-  text = text.replace(/https?:\/\/\S+/gi, 'our website'); // replace raw urls with natural phrase
+  text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+  text = text.replace(/[*_#`~>]/g, ' ');
+  text = text.replace(/\{[^}]+\}/g, ' ');
+  text = text.replace(/https?:\/\/\S+/gi, 'our website');
 
-  // 2. Normalize list markers and bullet points to smooth conversational flow
+  // 2. Remove list numbers & bullets
   text = text.replace(/^\s*[-•*]\s+/gm, ' ');
-  text = text.replace(/^\s*\d+\.\s+/gm, ' '); // remove "1. ", "2. " which make TTS say "one dot"
+  text = text.replace(/^\s*\d+\.\s+/gm, ' ');
 
-  // 3. Normalize common symbols to spoken natural words
+  // 3. Normalize common symbols
   text = text.replace(/&/g, ' and ');
   text = text.replace(/%/g, ' percent ');
   text = text.replace(/@/g, ' at ');
@@ -97,136 +81,93 @@ export function normalizeTextForNaturalSpeech(rawText: string): string {
   text = text.replace(/\$/g, ' dollars ');
   text = text.replace(/\b(KES|Ksh|KSh)\b/g, 'Kenyan Shillings');
 
-  // 4. Handle slashes in compound domain phrases (e.g. "HR/Payroll" -> "H-R and Payroll")
-  text = text.replace(/([a-zA-Z]+)\s*\/\s*([a-zA-Z]+)/g, '$1 and $2');
-
-  // 5. Kenyan & East African Enterprise Domain Terms (CRITICAL FOR PROPER PRONUNCIATION)
-  // eTIMS -> pronounced "ee-Tims" (otherwise synthesizers say "eh-tims" or spell "e-t-i-m-s")
-  text = text.replace(/\b(eTIMS|e-TIMS|ETIMS|etims)\b/g, 'ee-Tims');
-
-  // M-PESA / M-Pesa -> pronounced "Em-Pesa" (otherwise synthesizers say "M minus P E S A" or stumble)
-  text = text.replace(/\b(M-PESA|M-Pesa|mpesa|Mpesa|M-pesa)\b/g, 'Em-Pesa');
-
-  // ERP -> pronounced "E-R-P" (otherwise synthesizers pronounce it as "urp" like burp!)
-  text = text.replace(/\bERP\b/g, 'E-R-P');
-  text = text.replace(/\bERPs\b/g, 'E-R-Ps');
-
-  // KRA -> "K-R-A"
-  text = text.replace(/\bKRA\b/g, 'K-R-A');
-
-  // PAYE -> "P-A-Y-E" (otherwise synthesizers say "pay")
-  text = text.replace(/\bPAYE\b/g, 'P-A-Y-E');
-
-  // NSSF -> "N-S-S-F"
-  text = text.replace(/\bNSSF\b/g, 'N-S-S-F');
-
-  // NHIF -> "N-H-I-F"
-  text = text.replace(/\bNHIF\b/g, 'N-H-I-F');
-
-  // SHIF -> "Shif"
-  text = text.replace(/\bSHIF\b/g, 'Shif');
-
-  // STK Push -> "S-T-K Push"
-  text = text.replace(/\bSTK\b/g, 'S-T-K');
-
-  // PayBill -> "Pay Bill"
-  text = text.replace(/\b(PayBill|Paybill)\b/g, 'Pay Bill');
-
-  // P&L -> "Profit and Loss"
-  text = text.replace(/\b(P\s*and\s*L|P&L|P\/L)\b/gi, 'Profit and Loss');
-
-  // VisionONE -> "Vision One" (split compound name so TTS inflection is smooth and natural)
-  text = text.replace(/VisionONE/g, 'Vision One');
-
-  // 6. Common Tech, Accounting & Business Acronyms
+  // 4. Domain-specific phonetic replacements
+  text = text.replace(/\bHR\/Payroll\b/gi, 'H-R and Payroll');
   text = text.replace(/\bHR\b/g, 'H-R');
-  text = text.replace(/\bAI\b/g, 'A-I');
-  text = text.replace(/\bUI\b/g, 'U-I');
-  text = text.replace(/\bUX\b/g, 'U-X');
-  text = text.replace(/\bAPIs\b/g, 'A-P-Is');
-  text = text.replace(/\bAPI\b/g, 'A-P-I');
-  text = text.replace(/\bROI\b/g, 'R-O-I');
-  text = text.replace(/\bKPIs\b/g, 'K-P-Is');
-  text = text.replace(/\bKPI\b/g, 'K-P-I');
-  text = text.replace(/\bCEO\b/g, 'C-E-O');
-  text = text.replace(/\bCFO\b/g, 'C-F-O');
-  text = text.replace(/\bCOO\b/g, 'C-O-O');
-  text = text.replace(/\bCTO\b/g, 'C-T-O');
+  text = text.replace(/\bERP\b/g, 'E-R-P');
+  text = text.replace(/\b(M-Pesa|MPesa|M-PESA|MPESA)\b/g, 'Em-Pesa');
+  text = text.replace(/\beTIMS\b/g, 'ee-Tims');
+  text = text.replace(/\bETIMS\b/g, 'ee-Tims');
+  text = text.replace(/\bKRA\b/g, 'K-R-A');
+  text = text.replace(/\bVisionONE\b/g, 'Vision One');
+  text = text.replace(/\bPayBill\b/g, 'Pay Bill');
+  text = text.replace(/\bSTK Push\b/g, 'S-T-K Push');
   text = text.replace(/\bVAT\b/g, 'V-A-T');
-  text = text.replace(/\bSaaS\b/g, 'Sass');
-  text = text.replace(/\bBOM\b/g, 'Bill of Materials');
-  text = text.replace(/\bPOs\b/g, 'purchase orders');
-  text = text.replace(/\bPO\b/g, 'purchase order');
-  text = text.replace(/\be\.g\.,?\b/gi, 'for example,');
-  text = text.replace(/\bi\.e\.,?\b/gi, 'that is,');
-  text = text.replace(/\betc\.\b/gi, 'and so on.');
-  text = text.replace(/\b(vs\.|vs)\b/gi, 'versus');
-  text = text.replace(/\bw\/\b/gi, 'with');
-  text = text.replace(/\bw\/o\b/gi, 'without');
+  text = text.replace(/\bP&L\b/g, 'P and L');
+  text = text.replace(/\bAPI\b/g, 'A-P-I');
 
-  // 7. Punctuation & Cadence Tuning for Natural Breathing & Inflection:
-  // Convert colons, semicolons, and dashes to commas so the voice pauses naturally
-  text = text.replace(/[:;]/g, ',');
-  text = text.replace(/\s*—\s*|\s*--\s*/g, ', ');
-  text = text.replace(/\s*-\s+/g, ', ');
-
-  // Clean parentheses: "(something)" -> ", something,"
-  text = text.replace(/\(([^)]+)\)/g, ', $1,');
-
-  // Clean multiple commas and extra spaces
-  text = text.replace(/,+/g, ',');
-  text = text.replace(/\s+,/g, ',');
-  text = text.replace(/\s+/g, ' ').trim();
-
-  return text;
+  return text.replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * SpeechRecognitionManager
+ * Truly hands-free speech-to-text with auto-recovery, silence detection,
+ * automatic turn recycling, and watchdog revival for continuous conversation.
+ */
 export class SpeechRecognitionManager {
   private recognition: any = null;
   private isListening = false;
   private shouldBeListening = false;
-  private onResultCallback?: (text: string, isFinal: boolean) => void;
-  private onErrorCallback?: (error: string) => void;
-  private onEndCallback?: () => void;
-  private onStartCallback?: () => void;
-  private mediaStream: MediaStream | null = null;
-  private audioContext: AudioContext | null = null;
-  private analyser: AnalyserNode | null = null;
-  private dataArray: Uint8Array | null = null;
-  
-  // Buffering and silence detection to prevent lost user utterances
+  private isSpeakingOrThinking = false;
   private lastTranscript = '';
   private isSubmitted = false;
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
   private restartTimer: ReturnType<typeof setTimeout> | null = null;
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null;
+
+  private onResultCallback: ((text: string, isFinal: boolean) => void) | null = null;
+  private onErrorCallback: ((error: string) => void) | null = null;
+  private onStartCallback: (() => void) | null = null;
+  private onEndCallback: (() => void) | null = null;
+
+  // Audio Analyser for microphone input amplitude
+  private audioContext: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+  private dataArray: Uint8Array | null = null;
+  private mediaStream: MediaStream | null = null;
+  private hasRequestedMicPermission = false;
 
   constructor() {
-    this.initRecognition();
+    this.startWatchdog();
   }
 
-  private initRecognition() {
-    if (typeof window === 'undefined') return;
+  private startWatchdog() {
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+    }
+    // Check every 2.5 seconds: if hands-free listening is intended but inactive, revive immediately!
+    this.watchdogTimer = setInterval(() => {
+      if (this.shouldBeListening && !this.isSpeakingOrThinking && !this.isListening) {
+        this.safeStartRecognition();
+      }
+    }, 2500);
+  }
+
+  private createRecognitionInstance(): any {
+    if (typeof window === 'undefined') return null;
     const win = window as unknown as IWindow;
     const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
 
     if (!SpeechRecognitionClass) {
-      return;
+      return null;
     }
 
     try {
-      this.recognition = new SpeechRecognitionClass();
-      this.recognition.continuous = true;
-      this.recognition.interimResults = true;
-      this.recognition.lang = 'en-US';
+      const rec = new SpeechRecognitionClass();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.maxAlternatives = 1;
+      rec.lang = 'en-US';
 
-      this.recognition.onstart = () => {
+      rec.onstart = () => {
         this.isListening = true;
-        this.lastTranscript = '';
-        this.isSubmitted = false;
         this.onStartCallback?.();
       };
 
-      this.recognition.onresult = (event: any) => {
+      rec.onresult = (event: any) => {
+        // Discard any incoming sound while AI is actively speaking or thinking
+        if (this.isSpeakingOrThinking) return;
+
         let accumulatedFinal = '';
         let interimText = '';
 
@@ -242,114 +183,115 @@ export class SpeechRecognitionManager {
         const currentText = (accumulatedFinal + interimText).trim();
         if (currentText) {
           this.lastTranscript = currentText;
-        }
-
-        if (this.silenceTimer) {
-          clearTimeout(this.silenceTimer);
-          this.silenceTimer = null;
-        }
-
-        if (currentText) {
-          // Send interim live feedback to UI so user sees they are being heard
+          // Send live interim transcript so user sees they are heard immediately
           this.onResultCallback?.(currentText, false);
 
-          // Voice Activity Detection: 1.35 seconds of silence clearly distinguishes when user is finished talking
+          if (this.silenceTimer) {
+            clearTimeout(this.silenceTimer);
+            this.silenceTimer = null;
+          }
+
+          // Hands-free natural silence detector: 1.1s of silence auto-submits hands-free!
           this.silenceTimer = setTimeout(() => {
-            if (!this.isSubmitted && this.lastTranscript.trim()) {
+            if (!this.isSubmitted && this.lastTranscript.trim() && !this.isSpeakingOrThinking) {
               this.isSubmitted = true;
-              this.shouldBeListening = false;
-              const completedText = this.lastTranscript.trim();
-              this.onResultCallback?.(completedText, true);
-              this.stop();
+              const textToSend = this.lastTranscript.trim();
+              this.pauseListeningForAgentTurn();
+              this.onResultCallback?.(textToSend, true);
             }
-          }, 1350);
+          }, 1100);
         }
       };
 
-      this.recognition.onerror = (event: any) => {
-        if (this.silenceTimer) {
-          clearTimeout(this.silenceTimer);
-          this.silenceTimer = null;
+      rec.onerror = (event: any) => {
+        if (event.error === 'no-speech') {
+          // Expected in continuous mode when user is pauses or listens. Auto-restart handles it.
+          return;
         }
 
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
           this.shouldBeListening = false;
-          this.onErrorCallback?.('Microphone access is restricted by your browser. Please allow microphone permissions.');
-        } else if (event.error === 'no-speech') {
-          if (this.lastTranscript.trim() && !this.isSubmitted) {
-            this.isSubmitted = true;
-            this.shouldBeListening = false;
-            this.onResultCallback?.(this.lastTranscript.trim(), true);
-          } else if (this.shouldBeListening) {
-            // Keep listening automatically when silence occurs
-            this.scheduleAutoRestart();
-            return;
-          } else {
-            this.onEndCallback?.();
-          }
-        } else if (event.error !== 'aborted') {
-          if (this.shouldBeListening) {
-            this.scheduleAutoRestart();
-            return;
-          }
-          this.onErrorCallback?.(event.error);
+          this.isListening = false;
+          this.onErrorCallback?.('Microphone access is restricted. Please enable microphone permissions in your browser settings.');
+          return;
         }
-        this.isListening = false;
+
+        if (event.error === 'aborted') {
+          // Normal when pausing between turns
+          return;
+        }
       };
 
-      this.recognition.onend = () => {
+      rec.onend = () => {
+        this.isListening = false;
         if (this.silenceTimer) {
           clearTimeout(this.silenceTimer);
           this.silenceTimer = null;
         }
 
-        if (this.lastTranscript.trim() && !this.isSubmitted) {
-          this.isSubmitted = true;
-          this.shouldBeListening = false;
-          this.onResultCallback?.(this.lastTranscript.trim(), true);
-          this.isListening = false;
-          return;
+        // HANDS-FREE INFINITE LOOP: If we should be listening, revive immediately!
+        if (this.shouldBeListening && !this.isSpeakingOrThinking) {
+          this.scheduleQuickRestart();
+        } else {
+          this.onEndCallback?.();
         }
-
-        this.isListening = false;
-
-        // Automatically maintain active listening loop if expected to be listening hands-free
-        if (this.shouldBeListening && !this.isSubmitted) {
-          this.scheduleAutoRestart();
-          return;
-        }
-
-        this.onEndCallback?.();
       };
+
+      return rec;
     } catch (err) {
-      console.warn('SpeechRecognition initialization notice:', err);
+      console.warn('SpeechRecognition initialization error:', err);
+      return null;
     }
   }
 
-  private scheduleAutoRestart() {
+  private scheduleQuickRestart() {
     if (this.restartTimer) {
       clearTimeout(this.restartTimer);
     }
     this.restartTimer = setTimeout(() => {
-      if (this.shouldBeListening && !this.isListening) {
-        try {
-          this.recognition?.start();
-        } catch {}
+      if (this.shouldBeListening && !this.isListening && !this.isSpeakingOrThinking) {
+        this.safeStartRecognition();
       }
-    }, 150);
+    }, 60);
   }
 
-  public async requestMicrophonePermission(): Promise<boolean> {
+  private safeStartRecognition() {
+    if (!this.shouldBeListening || this.isSpeakingOrThinking) return;
+
+    try {
+      if (!this.recognition) {
+        this.recognition = this.createRecognitionInstance();
+      }
+      this.recognition?.start();
+    } catch (err: any) {
+      // If recognition is in invalid state or already closing, recreate fresh instance
+      try {
+        this.recognition?.abort();
+      } catch {}
+      this.recognition = this.createRecognitionInstance();
+      setTimeout(() => {
+        if (this.shouldBeListening && !this.isSpeakingOrThinking) {
+          try {
+            this.recognition?.start();
+          } catch {}
+        }
+      }, 100);
+    }
+  }
+
+  public async initMicrophoneAudio(): Promise<boolean> {
+    if (this.hasRequestedMicPermission && this.mediaStream) return true;
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       return false;
     }
     try {
+      this.hasRequestedMicPermission = true;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.mediaStream = stream;
       this.setupAudioAnalyser(stream);
       return true;
     } catch (err) {
-      console.warn('Microphone permission request rejected or restricted:', err);
+      console.warn('Microphone permission notice:', err);
       return false;
     }
   }
@@ -365,12 +307,12 @@ export class SpeechRecognitionManager {
       source.connect(this.analyser);
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
     } catch (e) {
-      console.warn('Audio analyzer skipped:', e);
+      console.warn('Audio analyzer setup notice:', e);
     }
   }
 
   public getMicAmplitude(): number {
-    if (!this.analyser || !this.dataArray || !this.isListening) {
+    if (!this.analyser || !this.dataArray || !this.isListening || this.isSpeakingOrThinking) {
       return 0;
     }
     try {
@@ -380,10 +322,49 @@ export class SpeechRecognitionManager {
         sum += this.dataArray[i];
       }
       const avg = sum / this.dataArray.length;
-      return Math.min(1, avg / 80);
-    } catch (e) {
+      return Math.min(1, avg / 75);
+    } catch {
       return 0;
     }
+  }
+
+  public submitNow(): boolean {
+    if (this.lastTranscript.trim() && !this.isSubmitted && !this.isSpeakingOrThinking) {
+      this.isSubmitted = true;
+      const completedText = this.lastTranscript.trim();
+      if (this.silenceTimer) {
+        clearTimeout(this.silenceTimer);
+        this.silenceTimer = null;
+      }
+      this.pauseListeningForAgentTurn();
+      this.onResultCallback?.(completedText, true);
+      return true;
+    }
+    return false;
+  }
+
+  public pauseListeningForAgentTurn() {
+    this.isSpeakingOrThinking = true;
+    if (this.silenceTimer) {
+      clearTimeout(this.silenceTimer);
+      this.silenceTimer = null;
+    }
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
+    try {
+      this.recognition?.abort();
+    } catch {}
+    this.isListening = false;
+  }
+
+  public resumeListeningAfterAgentTurn() {
+    this.isSpeakingOrThinking = false;
+    this.shouldBeListening = true;
+    this.isSubmitted = false;
+    this.lastTranscript = '';
+    this.safeStartRecognition();
   }
 
   public start(
@@ -392,14 +373,11 @@ export class SpeechRecognitionManager {
     onStart?: () => void,
     onEnd?: () => void
   ) {
-    if (!this.recognition) {
-      onError('Microphone speech input is restricted or unsupported in this browser environment.');
-      return;
-    }
-
     this.shouldBeListening = true;
+    this.isSpeakingOrThinking = false;
     this.lastTranscript = '';
     this.isSubmitted = false;
+
     if (this.silenceTimer) {
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
@@ -414,31 +392,18 @@ export class SpeechRecognitionManager {
     this.onStartCallback = onStart;
     this.onEndCallback = onEnd;
 
-    try {
-      this.recognition.start();
-    } catch (err: any) {
-      if (err.name === 'InvalidStateError') {
-        try {
-          this.recognition.stop();
-        } catch {}
-        setTimeout(() => {
-          try {
-            if (this.shouldBeListening) {
-              this.recognition.start();
-            }
-          } catch {
-            onError('Could not start microphone.');
-          }
-        }, 150);
-      } else {
-        onError('Microphone input could not be started.');
-      }
+    // Lazily trigger persistent mic stream for amplitude visualizer in background
+    if (!this.mediaStream) {
+      this.initMicrophoneAudio().catch(() => {});
     }
+
+    this.safeStartRecognition();
   }
 
   public stop() {
     this.shouldBeListening = false;
     this.isListening = false;
+    this.isSpeakingOrThinking = false;
     if (this.silenceTimer) {
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
@@ -447,23 +412,9 @@ export class SpeechRecognitionManager {
       clearTimeout(this.restartTimer);
       this.restartTimer = null;
     }
-    if (this.recognition) {
-      try {
-        this.recognition.stop();
-      } catch {}
-    }
-  }
-
-  public abort() {
-    this.shouldBeListening = false;
-    this.isListening = false;
-    if (this.silenceTimer) {
-      clearTimeout(this.silenceTimer);
-      this.silenceTimer = null;
-    }
-    if (this.restartTimer) {
-      clearTimeout(this.restartTimer);
-      this.restartTimer = null;
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
     }
     if (this.recognition) {
       try {
@@ -473,20 +424,27 @@ export class SpeechRecognitionManager {
   }
 
   public getListening(): boolean {
-    return this.isListening;
+    return this.isListening && !this.isSpeakingOrThinking;
   }
 }
 
+/**
+ * SpeechSynthesisManager
+ * Plays Gemini 3.1 Flash Neural Audio (ultra-realistic, human baritone tone)
+ * with robust HTML5 Audio handling, safety watchdogs, and browser speech fallback.
+ */
 export class SpeechSynthesisManager {
+  private currentAudio: HTMLAudioElement | null = null;
   private isSpeakingState = false;
   private warmMaleVoice: SpeechSynthesisVoice | null = null;
-  private chromeKeepAliveInterval: ReturnType<typeof setInterval> | null = null;
+  private watchdogTimer: ReturnType<typeof setTimeout> | null = null;
+  private voiceMode: 'neural' | 'browser' = 'neural';
 
   constructor() {
-    this.initVoices();
+    this.initBrowserVoices();
   }
 
-  private initVoices() {
+  private initBrowserVoices() {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
     const findVoice = () => {
@@ -502,10 +460,6 @@ export class SpeechSynthesisManager {
     };
   }
 
-  /**
-   * Deterministically locks a natural, warm baritone male voice with preference
-   * for modern high-definition Neural and Natural browser speech models.
-   */
   private selectWarmMaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
     if (!voices || voices.length === 0) return null;
 
@@ -519,23 +473,19 @@ export class SpeechSynthesisManager {
       const lowerName = voice.name.toLowerCase();
       let score = 0;
 
-      // 1. Strict filter against female voices
       if (FEMALE_VOICE_PATTERNS.some((fem) => lowerName.includes(fem))) {
         score -= 10000;
       }
 
-      // 2. Huge bonus for modern Neural / Natural / Enhanced voices
       if (
         lowerName.includes('online (natural)') ||
         lowerName.includes('natural') ||
         lowerName.includes('neural') ||
-        lowerName.includes('enhanced') ||
-        lowerName.includes('premium')
+        lowerName.includes('enhanced')
       ) {
         score += 3500;
       }
 
-      // 3. Priority list bonus
       for (let i = 0; i < WARM_MALE_VOICE_PRIORITY.length; i++) {
         if (lowerName.includes(WARM_MALE_VOICE_PRIORITY[i])) {
           score += 2500 - i * 40;
@@ -543,16 +493,12 @@ export class SpeechSynthesisManager {
         }
       }
 
-      // 4. Male indicator bonus
       if (lowerName.includes('male') && !lowerName.includes('female')) {
         score += 400;
       }
 
-      // 5. English accent preference
       if (voice.lang === 'en-US' || voice.lang === 'en-GB') {
         score += 100;
-      } else if (voice.lang.startsWith('en')) {
-        score += 50;
       }
 
       if (score > bestScore) {
@@ -564,25 +510,39 @@ export class SpeechSynthesisManager {
     return bestVoice || pool[0] || null;
   }
 
-  public getWarmVoice(): SpeechSynthesisVoice | null {
-    return this.warmMaleVoice;
-  }
-
-  public getActiveVoiceName(): string {
-    return this.warmMaleVoice ? this.warmMaleVoice.name : 'System Default Male';
-  }
-
   public isSpeaking(): boolean {
-    if (typeof window === 'undefined') return false;
-    return this.isSpeakingState || window.speechSynthesis?.speaking || false;
+    return this.isSpeakingState;
+  }
+
+  public getVoiceMode(): 'neural' | 'browser' {
+    return this.voiceMode;
+  }
+
+  public resume() {
+    if (typeof window !== 'undefined' && window.speechSynthesis?.paused) {
+      try {
+        window.speechSynthesis.resume();
+      } catch {}
+    }
   }
 
   public stop() {
     this.isSpeakingState = false;
-    if (this.chromeKeepAliveInterval) {
-      clearInterval(this.chromeKeepAliveInterval);
-      this.chromeKeepAliveInterval = null;
+
+    if (this.watchdogTimer) {
+      clearTimeout(this.watchdogTimer);
+      this.watchdogTimer = null;
     }
+
+    if (this.currentAudio) {
+      try {
+        this.currentAudio.pause();
+        this.currentAudio.currentTime = 0;
+        this.currentAudio.src = '';
+      } catch {}
+      this.currentAudio = null;
+    }
+
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       try {
         window.speechSynthesis.cancel();
@@ -590,96 +550,205 @@ export class SpeechSynthesisManager {
     }
   }
 
+  /**
+   * Speaks text using ultra-realistic Gemini Neural Audio if available,
+   * with automatic fallback to browser speech synthesis.
+   */
   public async speakText(
     text: string,
+    options: {
+      audioUrl?: string | null;
+      rate?: number;
+      pitch?: number;
+      onStart?: () => void;
+      onEnd?: () => void;
+      onError?: (err: any) => void;
+      onAutoplayBlocked?: () => void;
+    } = {}
+  ): Promise<void> {
+    this.stop();
+
+    const spokenText = normalizeTextForNaturalSpeech(text);
+    if (!spokenText) {
+      options.onEnd?.();
+      return;
+    }
+
+    // 1. If high-definition Neural Audio URL is provided, play via HTML5 Audio
+    if (options.audioUrl) {
+      try {
+        await this.playNeuralAudio(options.audioUrl, spokenText, options);
+        return;
+      } catch (err) {
+        console.warn('Neural audio playback issue, falling back to browser speech:', err);
+      }
+    }
+
+    // 2. Fetch neural audio on demand if not provided
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: spokenText, voice: 'Charon' }),
+      });
+      const data = await res.json();
+      if (data.audioUrl) {
+        await this.playNeuralAudio(data.audioUrl, spokenText, options);
+        return;
+      }
+    } catch (ttsErr) {
+      console.warn('On-demand TTS fetch notice:', ttsErr);
+    }
+
+    // 3. Fallback to enhanced browser SpeechSynthesis
+    this.playBrowserSpeech(spokenText, options);
+  }
+
+  private playNeuralAudio(
+    audioUrl: string,
+    spokenText: string,
+    options: {
+      onStart?: () => void;
+      onEnd?: () => void;
+      onError?: (err: any) => void;
+      onAutoplayBlocked?: () => void;
+    }
+  ): Promise<void> {
+    return new Promise((resolve) => {
+      this.voiceMode = 'neural';
+      this.isSpeakingState = true;
+
+      const audio = new Audio(audioUrl);
+      this.currentAudio = audio;
+      audio.volume = 1.0;
+
+      let isFinished = false;
+      const cleanup = () => {
+        if (isFinished) return;
+        isFinished = true;
+        this.isSpeakingState = false;
+        if (this.watchdogTimer) {
+          clearTimeout(this.watchdogTimer);
+          this.watchdogTimer = null;
+        }
+        if (this.currentAudio === audio) {
+          this.currentAudio = null;
+        }
+      };
+
+      audio.onplay = () => {
+        options.onStart?.();
+
+        // Safety watchdog: ensure state advances even if audio events miss
+        const durationSec = audio.duration && !isNaN(audio.duration) ? audio.duration : Math.max(3, spokenText.split(' ').length * 0.45);
+        this.watchdogTimer = setTimeout(() => {
+          if (!isFinished) {
+            cleanup();
+            options.onEnd?.();
+            resolve();
+          }
+        }, Math.ceil(durationSec * 1000) + 1500);
+      };
+
+      audio.onended = () => {
+        cleanup();
+        options.onEnd?.();
+        resolve();
+      };
+
+      audio.onerror = (e) => {
+        cleanup();
+        options.onError?.(e);
+        // Fall back to browser speech if audio element fails
+        this.playBrowserSpeech(spokenText, options);
+        resolve();
+      };
+
+      audio.play().catch((playErr: any) => {
+        console.warn('Audio play autoplay policy notice:', playErr);
+        if (playErr?.name === 'NotAllowedError') {
+          options.onAutoplayBlocked?.();
+        }
+        cleanup();
+        this.playBrowserSpeech(spokenText, options);
+        resolve();
+      });
+    });
+  }
+
+  private playBrowserSpeech(
+    spokenText: string,
     options: {
       rate?: number;
       pitch?: number;
       onStart?: () => void;
       onEnd?: () => void;
       onError?: (err: any) => void;
-    } = {}
-  ): Promise<void> {
+    }
+  ) {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
       options.onEnd?.();
       return;
     }
 
-    this.stop();
+    this.voiceMode = 'browser';
+    this.isSpeakingState = true;
 
-    // Run comprehensive phonetic and natural speech pre-processing
-    const spokenText = normalizeTextForNaturalSpeech(text);
+    const utterance = new SpeechSynthesisUtterance(spokenText);
+    utterance.pitch = options.pitch !== undefined ? Math.min(1.05, Math.max(0.96, options.pitch)) : 1.0;
+    utterance.rate = options.rate !== undefined ? Math.min(1.05, Math.max(0.92, options.rate)) : 0.98;
+    utterance.volume = 1.0;
+    utterance.lang = 'en-US';
 
-    if (!spokenText) {
+    if (this.warmMaleVoice) {
+      utterance.voice = this.warmMaleVoice;
+    }
+
+    let isFinished = false;
+    const cleanup = () => {
+      if (isFinished) return;
+      isFinished = true;
+      this.isSpeakingState = false;
+      if (this.watchdogTimer) {
+        clearTimeout(this.watchdogTimer);
+        this.watchdogTimer = null;
+      }
+    };
+
+    utterance.onstart = () => {
+      options.onStart?.();
+
+      // Browser TTS watchdog: guarantee completion within 12 seconds max
+      const estimatedSec = Math.max(2.5, spokenText.split(' ').length * 0.45);
+      this.watchdogTimer = setTimeout(() => {
+        if (!isFinished) {
+          cleanup();
+          try {
+            window.speechSynthesis.cancel();
+          } catch {}
+          options.onEnd?.();
+        }
+      }, Math.ceil(estimatedSec * 1000) + 1200);
+    };
+
+    utterance.onend = () => {
+      cleanup();
       options.onEnd?.();
-      return;
+    };
+
+    utterance.onerror = (e) => {
+      cleanup();
+      if (e.error !== 'canceled' && e.error !== 'interrupted') {
+        options.onError?.(e);
+      }
+      options.onEnd?.();
+    };
+
+    try {
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      cleanup();
+      options.onEnd?.();
     }
-
-    if (!this.warmMaleVoice) {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices && voices.length > 0) {
-        this.warmMaleVoice = this.selectWarmMaleVoice(voices);
-      }
-    }
-
-    return new Promise((resolve) => {
-      const utterance = new SpeechSynthesisUtterance(spokenText);
-      // Native pitch (1.0) preserves acoustic warmth and prevents digital distortion
-      utterance.pitch = options.pitch !== undefined ? Math.min(1.05, Math.max(0.96, options.pitch)) : 1.0;
-      // 0.98 rate gives deliberate, highly articulate enterprise diction
-      utterance.rate = options.rate !== undefined ? Math.min(1.1, Math.max(0.9, options.rate)) : 0.98;
-      utterance.volume = 1.0;
-      utterance.lang = 'en-US';
-
-      if (this.warmMaleVoice) {
-        utterance.voice = this.warmMaleVoice;
-      }
-
-      const cleanup = () => {
-        this.isSpeakingState = false;
-        if (this.chromeKeepAliveInterval) {
-          clearInterval(this.chromeKeepAliveInterval);
-          this.chromeKeepAliveInterval = null;
-        }
-      };
-
-      utterance.onstart = () => {
-        this.isSpeakingState = true;
-        options.onStart?.();
-
-        if (this.chromeKeepAliveInterval) {
-          clearInterval(this.chromeKeepAliveInterval);
-        }
-        // Prevents Chrome 15s pause bug during speech
-        this.chromeKeepAliveInterval = setInterval(() => {
-          if (window.speechSynthesis?.speaking && window.speechSynthesis?.paused) {
-            window.speechSynthesis.resume();
-          }
-        }, 2000);
-      };
-
-      utterance.onend = () => {
-        cleanup();
-        options.onEnd?.();
-        resolve();
-      };
-
-      utterance.onerror = (e) => {
-        cleanup();
-        if (e.error !== 'canceled' && e.error !== 'interrupted') {
-          options.onError?.(e);
-        }
-        options.onEnd?.();
-        resolve();
-      };
-
-      try {
-        window.speechSynthesis.speak(utterance);
-      } catch (err) {
-        cleanup();
-        options.onEnd?.();
-        resolve();
-      }
-    });
   }
 }

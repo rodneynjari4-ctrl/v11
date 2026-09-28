@@ -1,7 +1,18 @@
 import React from 'react';
 import { VoiceState, ChatMessage } from '../types';
 import { VoiceOrb } from './VoiceOrb';
-import { Mic, Square, Loader2, Volume2, Sparkles, ArrowRight, Play } from 'lucide-react';
+import {
+  Mic,
+  Square,
+  Loader2,
+  Volume2,
+  Sparkles,
+  ArrowRight,
+  CheckCircle,
+  RotateCcw,
+  X,
+  ShieldCheck,
+} from 'lucide-react';
 
 interface VoiceModeViewProps {
   voiceState: VoiceState;
@@ -12,11 +23,16 @@ interface VoiceModeViewProps {
   activePlayingText: string | null;
   hasStarted?: boolean;
   liveTranscript?: string;
+  isConversationOver?: boolean;
+  isAutoplayBlocked?: boolean;
   onToggleMic: () => void;
   onRetry: () => void;
-  onPlayVoice: (text: string) => void;
+  onPlayVoice: (text: string, audioUrl?: string) => void;
+  onSubmitTranscript?: () => void;
   onSelectQuestion: (question: string) => void;
   onOpenCta: (type: 'demo' | 'contact' | 'quote') => void;
+  onClose?: () => void;
+  onRestartConversation?: () => void;
   micDisabled?: boolean;
 }
 
@@ -29,11 +45,16 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
   activePlayingText,
   hasStarted = false,
   liveTranscript = '',
+  isConversationOver = false,
+  isAutoplayBlocked = false,
   onToggleMic,
   onRetry,
   onPlayVoice,
+  onSubmitTranscript,
   onSelectQuestion,
   onOpenCta,
+  onClose,
+  onRestartConversation,
   micDisabled = false,
 }) => {
   const isListening = voiceState === 'listening';
@@ -41,25 +62,47 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
   const isThinking = voiceState === 'thinking';
 
   const getStatusLabel = () => {
+    if (isConversationOver) {
+      return 'Conversation finished. You can restart or close the widget below.';
+    }
+    if (isAutoplayBlocked) {
+      return 'Browser requires a tap to enable audio & speech';
+    }
     if (!hasStarted && voiceState === 'idle') {
-      return 'Tap the microphone or orb to begin speaking';
+      return 'Assistant is introducing himself...';
     }
     if (isListening) {
       return liveTranscript
-        ? 'Hearing your voice... pause when finished'
-        : 'Listening... speak freely';
+        ? 'Hearing your voice... pause or tap Send'
+        : 'Listening hands-free... speak anytime';
     }
-    if (isThinking) return 'Analyzing question and preparing response...';
-    if (isSpeaking) return 'Speaking response aloud (tap to interrupt)';
+    if (isThinking) return 'Evaluating with QA Critic & synthesizing speech...';
+    if (isSpeaking) return 'Speaking neural audio response (tap orb to pause)';
     return 'Hands-free mode active — speak anytime';
   };
 
   const getStatusBadge = () => {
+    if (isConversationOver) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold shadow-2xs">
+          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+          Conversation Completed
+        </span>
+      );
+    }
+    if (isAutoplayBlocked) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-300 text-amber-800 text-xs font-semibold animate-pulse">
+          <Volume2 className="w-3.5 h-3.5 text-amber-600" />
+          Tap to Enable Voice
+        </span>
+      );
+    }
     if (!hasStarted && voiceState === 'idle') {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E5F0FE] border border-[#1D8DE6]/40 text-[#1D8DE6] text-xs font-semibold shadow-2xs">
           <Sparkles className="w-3.5 h-3.5 text-[#1D8DE6]" />
-          Tap to Speak to Start
+          Starting Voice AI...
         </span>
       );
     }
@@ -67,7 +110,7 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-700 text-xs font-semibold animate-pulse">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-          Listening (Pause to Answer)
+          Listening (Hands-Free)
         </span>
       );
     }
@@ -75,7 +118,7 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1D8DE6]/10 border border-[#1D8DE6]/30 text-[#1D8DE6] text-xs font-semibold">
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          Consulting VisionONE ERP...
+          Critic QA & Voice Synthesis...
         </span>
       );
     }
@@ -83,7 +126,7 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 text-xs font-semibold">
           <Volume2 className="w-3.5 h-3.5 animate-bounce" />
-          Speaking Spoken Answer
+          Speaking Neural Voice
         </span>
       );
     }
@@ -122,15 +165,26 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
         <div className="w-full max-w-sm mt-3 space-y-2">
           {/* Live speech feedback while user is actively talking */}
           {liveTranscript && isListening && (
-            <div className="bg-[#E5F0FE] border border-[#1D8DE6]/40 rounded-xl p-2.5 text-xs text-[#111A3A] flex flex-col gap-1 shadow-xs animate-pulse">
+            <div className="bg-[#E5F0FE] border border-[#1D8DE6]/40 rounded-xl p-2.5 text-xs text-[#111A3A] flex flex-col gap-1.5 shadow-xs animate-pulse">
               <div className="flex items-center justify-between text-[10px] text-[#1D8DE6] font-semibold font-['Sora']">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                   Hearing you:
                 </span>
-                <span className="text-[9px] text-[#111A3A]/60 font-normal font-['Inter']">
-                  Pause when finished
-                </span>
+                {onSubmitTranscript ? (
+                  <button
+                    onClick={onSubmitTranscript}
+                    className="px-2 py-0.5 rounded-full bg-[#1D8DE6] hover:bg-[#111A3A] text-white text-[9px] font-semibold transition cursor-pointer flex items-center gap-1"
+                    title="Send message immediately"
+                  >
+                    <span>Done speaking</span>
+                    <ArrowRight className="w-2.5 h-2.5" />
+                  </button>
+                ) : (
+                  <span className="text-[9px] text-[#111A3A]/60 font-normal font-['Inter']">
+                    Pause when finished
+                  </span>
+                )}
               </div>
               <p className="font-['Inter'] font-medium text-[#111A3A] italic leading-snug">
                 "{liveTranscript}"
@@ -153,16 +207,32 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
                 <span className="font-bold flex items-center gap-1 text-[#1D8DE6] font-['Sora']">
                   <Sparkles className="w-3 h-3" /> Voice Response:
                 </span>
-                {onPlayVoice && (
-                  <button
-                    onClick={() => onPlayVoice(lastAssistantMessage.voiceText || lastAssistantMessage.text)}
-                    className="flex items-center gap-1 text-[#1D8DE6] hover:underline cursor-pointer font-medium"
-                    title="Replay spoken answer"
-                  >
-                    <Volume2 className="w-3 h-3" />
-                    <span>Replay Audio</span>
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {lastAssistantMessage.qaScore && (
+                    <span
+                      className="inline-flex items-center gap-0.5 text-[9px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded-sm font-['IBM_Plex_Mono']"
+                      title={lastAssistantMessage.qaCritique || "QA Critic Verified"}
+                    >
+                      <ShieldCheck className="w-2.5 h-2.5 text-emerald-500" />
+                      {lastAssistantMessage.qaScore}% QA
+                    </span>
+                  )}
+                  {onPlayVoice && (
+                    <button
+                      onClick={() =>
+                        onPlayVoice(
+                          lastAssistantMessage.voiceText || lastAssistantMessage.text,
+                          lastAssistantMessage.audioUrl
+                        )
+                      }
+                      className="flex items-center gap-1 text-[#1D8DE6] hover:underline cursor-pointer font-medium"
+                      title="Replay spoken answer"
+                    >
+                      <Volume2 className="w-3 h-3" />
+                      <span>Replay</span>
+                    </button>
+                  )}
+                </div>
               </div>
               <p className="text-xs font-['Inter'] text-[#111A3A] leading-relaxed line-clamp-3">
                 {lastAssistantMessage.voiceText || lastAssistantMessage.text}
@@ -179,62 +249,119 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
               )}
             </div>
           )}
+
+          {/* Conversation Completed Action Panel */}
+          {isConversationOver && (
+            <div className="bg-gradient-to-r from-emerald-50/80 to-blue-50/80 border border-emerald-200 rounded-xl p-3 shadow-xs space-y-2 animate-in fade-in duration-300">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 font-['Sora']">
+                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Conversation Concluded</span>
+              </div>
+              <p className="text-[11px] text-slate-700 font-['Inter'] leading-relaxed">
+                Thank you for speaking with VisionONE Access AI. Would you like to start a fresh conversation or close the widget?
+              </p>
+              <div className="flex items-center gap-2 pt-1">
+                {onRestartConversation && (
+                  <button
+                    onClick={onRestartConversation}
+                    className="flex-1 py-1.5 px-3 rounded-lg bg-[#1D8DE6] hover:bg-[#111A3A] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer font-['Sora']"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>New Chat</span>
+                  </button>
+                )}
+                {onClose && (
+                  <button
+                    onClick={onClose}
+                    className="flex-1 py-1.5 px-3 rounded-lg bg-slate-200 hover:bg-red-500 hover:text-white text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer font-['Sora']"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Close Widget</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Primary Voice Controls (Status & Quick Topic Chips) */}
+      {/* Primary Voice Controls */}
       <div className="w-full flex flex-col items-center gap-2 pt-1 shrink-0">
-        <div className="flex flex-col items-center gap-1">
-          {/* Hands-free Toggle / Start Mic Button */}
-          <button
-            type="button"
-            onClick={onToggleMic}
-            disabled={micDisabled || isThinking}
-            aria-label={
-              !hasStarted
-                ? 'Tap to speak'
+        {!isConversationOver ? (
+          <div className="flex flex-col items-center gap-1">
+            {/* Hands-free Toggle / Start Mic Button */}
+            <button
+              type="button"
+              onClick={onToggleMic}
+              disabled={micDisabled || isThinking}
+              aria-label={
+                !hasStarted
+                  ? 'Tap to speak'
+                  : isListening
+                  ? 'Pause listening'
+                  : isSpeaking
+                  ? 'Interrupt speaking'
+                  : 'Resume listening'
+              }
+              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 cursor-pointer active:scale-95 focus:outline-none focus:ring-4 ${
+                !hasStarted && voiceState === 'idle'
+                  ? 'bg-gradient-to-tr from-[#111A3A] via-[#1D8DE6] to-[#35A6F7] text-white shadow-[#1D8DE6]/40 ring-4 ring-[#1D8DE6]/30 hover:scale-105 animate-pulse'
+                  : isListening
+                  ? 'bg-emerald-600 text-white shadow-emerald-600/40 ring-emerald-300 animate-pulse'
+                  : isSpeaking
+                  ? 'bg-[#111A3A] text-white shadow-[#111A3A]/30 ring-[#1D8DE6]/40 hover:bg-[#1D8DE6]'
+                  : 'bg-gradient-to-tr from-[#1D8DE6] to-[#35A6F7] text-white shadow-[#1D8DE6]/30 ring-[#1D8DE6]/30 hover:scale-105'
+              }`}
+            >
+              {isThinking ? (
+                <Loader2 className="w-6 h-6 animate-spin" />
+              ) : isListening ? (
+                <Mic className="w-6 h-6 sm:w-7 sm:h-7 animate-pulse" />
+              ) : isSpeaking ? (
+                <Square className="w-5 h-5 fill-current" />
+              ) : (
+                <Mic className="w-6 h-6 sm:w-7 sm:h-7" />
+              )}
+            </button>
+
+            <span className="text-[10px] font-semibold text-[#111A3A]/70 font-['Sora'] tracking-tight">
+              {!hasStarted && voiceState === 'idle'
+                ? 'Tap to Speak'
                 : isListening
-                ? 'Pause listening'
+                ? 'Listening...'
                 : isSpeaking
-                ? 'Interrupt speaking'
-                : 'Resume listening'
-            }
-            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 cursor-pointer active:scale-95 focus:outline-none focus:ring-4 ${
-              !hasStarted && voiceState === 'idle'
-                ? 'bg-gradient-to-tr from-[#111A3A] via-[#1D8DE6] to-[#35A6F7] text-white shadow-[#1D8DE6]/40 ring-4 ring-[#1D8DE6]/30 hover:scale-105 animate-pulse'
-                : isListening
-                ? 'bg-emerald-600 text-white shadow-emerald-600/40 ring-emerald-300 animate-pulse'
-                : isSpeaking
-                ? 'bg-[#111A3A] text-white shadow-[#111A3A]/30 ring-[#1D8DE6]/40 hover:bg-[#1D8DE6]'
-                : 'bg-gradient-to-tr from-[#1D8DE6] to-[#35A6F7] text-white shadow-[#1D8DE6]/30 ring-[#1D8DE6]/30 hover:scale-105'
-            }`}
-          >
-            {isThinking ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
-            ) : isListening ? (
-              <Mic className="w-6 h-6 sm:w-7 sm:h-7 animate-pulse" />
-            ) : isSpeaking ? (
-              <Square className="w-5 h-5 fill-current" />
-            ) : (
-              <Mic className="w-6 h-6 sm:w-7 sm:h-7" />
+                ? 'Tap to Pause'
+                : isThinking
+                ? 'Thinking...'
+                : 'Tap to Speak'}
+            </span>
+          </div>
+        ) : (
+          /* When conversation is over, provide explicit close or restart action */
+          <div className="flex items-center gap-3">
+            {onRestartConversation && (
+              <button
+                onClick={onRestartConversation}
+                className="px-4 py-2 rounded-full bg-[#1D8DE6] hover:bg-[#111A3A] text-white text-xs font-semibold font-['Sora'] shadow-md flex items-center gap-1.5 transition cursor-pointer active:scale-95"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Start New Conversation</span>
+              </button>
             )}
-          </button>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-full bg-slate-200 hover:bg-red-500 hover:text-white text-slate-800 text-xs font-semibold font-['Sora'] shadow-sm flex items-center gap-1.5 transition cursor-pointer active:scale-95"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Close Widget</span>
+              </button>
+            )}
+          </div>
+        )}
 
-          <span className="text-[10px] font-semibold text-[#111A3A]/70 font-['Sora'] tracking-tight">
-            {!hasStarted && voiceState === 'idle'
-              ? 'Tap to Speak'
-              : isListening
-              ? 'Listening...'
-              : isSpeaking
-              ? 'Tap to Pause'
-              : isThinking
-              ? 'Thinking...'
-              : 'Tap to Speak'}
-          </span>
-        </div>
-
-        {/* Quick Voice Topics (Tap any to speak question aloud instantly) */}
-        {suggestedQuestions.length > 0 && (
+        {/* Quick Voice Topics */}
+        {suggestedQuestions.length > 0 && !isConversationOver && (
           <div className="w-full flex flex-col items-center gap-1 mt-1">
             <span className="text-[10px] text-[#111A3A]/60 font-['Inter']">
               Or tap any topic to ask:

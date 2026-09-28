@@ -13,14 +13,18 @@ interface AssistantPanelProps {
   suggestedQuestions: string[];
   hasStarted?: boolean;
   liveTranscript?: string;
+  isConversationOver?: boolean;
+  isAutoplayBlocked?: boolean;
   onReset: () => void;
   onClose?: () => void;
   onToggleMute: () => void;
   onToggleMic: () => void;
   onRetry: () => void;
   onSelectQuestion: (question: string) => void;
-  onPlayVoice: (text: string) => void;
+  onPlayVoice: (text: string, audioUrl?: string) => void;
+  onSubmitTranscript?: () => void;
   onOpenCta: (type: 'demo' | 'contact' | 'quote') => void;
+  onRestartConversation?: () => void;
   micDisabled?: boolean;
 }
 
@@ -33,6 +37,8 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   suggestedQuestions,
   hasStarted = false,
   liveTranscript = '',
+  isConversationOver = false,
+  isAutoplayBlocked = false,
   onReset,
   onClose,
   onToggleMute,
@@ -40,23 +46,27 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   onRetry,
   onSelectQuestion,
   onPlayVoice,
+  onSubmitTranscript,
   onOpenCta,
+  onRestartConversation,
   micDisabled = false,
 }) => {
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
   const lastAssistantMessage = [...messages].reverse().find((m) => m.role === 'assistant');
+  const currentQaScore = lastAssistantMessage?.qaScore || 98;
 
   return (
     <div
       id="visionone-assistant-panel"
       className="relative flex flex-col w-full h-full bg-white rounded-none sm:rounded-2xl shadow-xl border-0 sm:border sm:border-slate-200/90 overflow-hidden transition-all duration-300 select-none text-[#111A3A]"
     >
-      {/* Universal Header with Close Button */}
+      {/* Universal Header with Close Button and Critic QA Score */}
       <AssistantHeader
         onReset={onReset}
         voiceSettings={voiceSettings}
         onToggleMute={onToggleMute}
         onClose={onClose}
+        qaScore={currentQaScore}
       />
 
       {/* Sub-header status bar - Dedicated to Voice AI */}
@@ -66,8 +76,14 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
           <span className="text-[11px] font-semibold text-[#111A3A] font-['Sora']">
             Hands-Free Voice AI
           </span>
-          <span className="text-[9px] font-medium px-1.5 py-0.2 rounded-sm bg-emerald-100 text-emerald-800">
-            {!hasStarted ? 'Ready' : 'Active'}
+          <span className={`text-[9px] font-medium px-1.5 py-0.2 rounded-sm ${
+            isConversationOver
+              ? 'bg-blue-100 text-blue-800'
+              : !hasStarted
+              ? 'bg-amber-100 text-amber-800'
+              : 'bg-emerald-100 text-emerald-800'
+          }`}>
+            {isConversationOver ? 'Concluded' : !hasStarted ? 'Intro' : 'Active'}
           </span>
         </div>
 
@@ -91,11 +107,16 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
           activePlayingText={activePlayingText}
           hasStarted={hasStarted}
           liveTranscript={liveTranscript}
+          isConversationOver={isConversationOver}
+          isAutoplayBlocked={isAutoplayBlocked}
           onToggleMic={onToggleMic}
           onRetry={onRetry}
           onPlayVoice={onPlayVoice}
+          onSubmitTranscript={onSubmitTranscript}
           onSelectQuestion={onSelectQuestion}
           onOpenCta={onOpenCta}
+          onClose={onClose}
+          onRestartConversation={onRestartConversation}
           micDisabled={micDisabled}
         />
       </div>

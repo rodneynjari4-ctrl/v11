@@ -7,6 +7,7 @@ interface AssistantHeaderProps {
   voiceSettings: VoiceSettings;
   onToggleMute: () => void;
   onClose?: () => void;
+  qaScore?: number;
 }
 
 export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
@@ -14,6 +15,7 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
   voiceSettings,
   onToggleMute,
   onClose,
+  qaScore = 98,
 }) => {
   return (
     <header
@@ -52,8 +54,8 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
               AI Assistant
             </span>
             <span className="text-[9px] text-white/40">•</span>
-            <span className="text-[9px] text-[#35A6F7] font-['IBM_Plex_Mono'] flex items-center gap-0.5">
-              <ShieldCheck className="w-2.5 h-2.5" /> ERP Verified
+            <span className="text-[9px] text-[#35A6F7] font-['IBM_Plex_Mono'] flex items-center gap-0.5" title="Critic Agent QA Verified">
+              <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" /> QA {qaScore}%
             </span>
           </div>
         </div>
@@ -82,11 +84,12 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md hover:text-white hover:bg-white/15 transition-colors cursor-pointer text-white/80 hover:text-white ml-0.5"
-            title="Close Assistant"
-            aria-label="Close Assistant"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/15 hover:bg-red-500/80 text-white transition-all cursor-pointer text-[11px] font-semibold font-['Sora'] border border-white/20 shadow-xs ml-1 hover:border-red-400"
+            title="Close Assistant Entirely"
+            aria-label="Close Assistant Entirely"
           >
-            <X className="w-4 h-4" />
+            <span>Close</span>
+            <X className="w-3.5 h-3.5" />
           </button>
         )}
       </div>

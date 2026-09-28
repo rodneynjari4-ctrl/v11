@@ -9,8 +9,12 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
   voiceText?: string;
+  audioUrl?: string;
   timestamp: number;
   intent?: string;
+  isConversationOver?: boolean;
+  qaScore?: number;
+  qaCritique?: string;
   suggestedQuestions?: string[];
   cta?: {
     type: 'demo' | 'contact' | 'quote';
