@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, Copy, Code2, Globe, Sparkles, CheckCircle2 } from 'lucide-react';
+import { X, Check, Copy, Globe, Sparkles, CheckCircle2, AlertCircle, ShieldAlert } from 'lucide-react';
 
 interface EmbedModalProps {
   isOpen: boolean;
@@ -7,21 +7,20 @@ interface EmbedModalProps {
 }
 
 export const EmbedModal: React.FC<EmbedModalProps> = ({ isOpen, onClose }) => {
-  const [copiedType, setCopiedType] = useState<'script' | 'iframe' | null>(null);
-  const [activeTab, setActiveTab] = useState<'script' | 'iframe'>('script');
+  const [copiedType, setCopiedType] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'widget' | 'embed' | 'iframe'>('widget');
 
   if (!isOpen) return null;
 
-  // Determine current origin or production fallback
-  const origin = typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost')
-    ? window.location.origin
-    : 'https://ais-pre-yuzi6mz2n65mjlj7o57dmr-606047717939.europe-west2.run.app';
+  // Use the public Shared App URL for production embedding
+  const publicOrigin = 'https://ais-pre-yuzi6mz2n65mjlj7o57dmr-606047717939.europe-west2.run.app';
 
-  const scriptCode = `<script src="${origin}/embed.js"></script>`;
+  const widgetScriptCode = `<script src="${publicOrigin}/widget.js"></script>`;
+  const embedScriptCode = `<script src="${publicOrigin}/embed.js"></script>`;
 
   const iframeHtmlCode = `<!-- VisionONE Voice AI Widget for WordPress HFCM -->
 <div id="visionone-ai-root" style="position:fixed;bottom:20px;right:20px;z-index:99999999;width:270px;height:76px;background:transparent !important;transition:all 0.28s ease;">
-  <iframe id="visionone-ai-frame" src="${origin}" allow="microphone *; autoplay *; clipboard-write *" allowtransparency="true" style="width:100%;height:100%;border:none;background:transparent !important;background-color:transparent !important;"></iframe>
+  <iframe id="visionone-ai-frame" src="${publicOrigin}" allow="microphone *; autoplay *; clipboard-write *" allowtransparency="true" frameborder="0" style="width:100%;height:100%;border:none;background:transparent !important;background-color:transparent !important;"></iframe>
 </div>
 <script>
 (function() {
@@ -29,9 +28,7 @@ export const EmbedModal: React.FC<EmbedModalProps> = ({ isOpen, onClose }) => {
     if (!e.data || e.data.type !== 'VISIONONE_WIDGET_STATE') return;
     var el = document.getElementById('visionone-ai-root');
     if (!el) return;
-    if (e.data.isClosedCompletely) {
-      el.style.display = 'none';
-    } else if (e.data.isOpen) {
+    if (e.data.isOpen) {
       var isMobile = window.innerWidth <= 480;
       el.style.display = 'block';
       el.style.width = isMobile ? '100vw' : '395px';
@@ -49,7 +46,7 @@ export const EmbedModal: React.FC<EmbedModalProps> = ({ isOpen, onClose }) => {
 })();
 </script>`;
 
-  const copyToClipboard = (text: string, type: 'script' | 'iframe') => {
+  const copyToClipboard = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
     setCopiedType(type);
     setTimeout(() => setCopiedType(null), 2500);
@@ -70,7 +67,7 @@ export const EmbedModal: React.FC<EmbedModalProps> = ({ isOpen, onClose }) => {
             </div>
             <div>
               <h2 className="text-sm font-bold font-['Sora'] leading-tight">WordPress HFCM Embed Code</h2>
-              <p className="text-[11px] text-white/80 font-['Inter']">Zero white background • Auto-resizing • Complete close</p>
+              <p className="text-[11px] text-white/80 font-['Inter']">Zero white background • Full microphone access • Universal embedding</p>
             </div>
           </div>
           <button
@@ -84,50 +81,60 @@ export const EmbedModal: React.FC<EmbedModalProps> = ({ isOpen, onClose }) => {
 
         {/* Content */}
         <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs font-['Inter'] text-[#111A3A]">
-          {/* Explanation Banner */}
-          <div className="p-3 bg-blue-50/80 border border-blue-200/80 rounded-xl space-y-1.5">
-            <div className="flex items-center gap-1.5 font-bold font-['Sora'] text-blue-900 text-xs">
-              <Sparkles className="w-3.5 h-3.5 text-[#1D8DE6]" />
-              <span>Why this solves the WordPress issue</span>
+          {/* Critical Tip Banner */}
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
+            <div className="flex items-center gap-1.5 font-bold font-['Sora'] text-amber-900 text-xs">
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+              <span>Important for Embedding</span>
             </div>
-            <p className="text-[11px] text-blue-800 leading-relaxed">
-              Standard iframes on WordPress stay at a fixed width/height and have default white backgrounds. Our workaround uses dynamic responsive messaging: when closed, the frame shrinks to the exact button size with 100% transparency. When closed completely, it hides entirely!
+            <p className="text-[11px] text-amber-800 leading-relaxed">
+              Google blocks iframes of the internal <code>ais-dev</code> URL due to Google account security headers. Always use the public Shared URL (<code>ais-pre</code>) or the direct script (<code>widget.js</code>), and click <strong>Share</strong> in AI Studio so Cloud Run publishes the public domain.
             </p>
           </div>
 
           {/* Tab Selector */}
           <div className="flex rounded-lg bg-slate-100 p-1 gap-1 text-[11px] font-semibold">
             <button
-              onClick={() => setActiveTab('script')}
-              className={`flex-1 py-1.5 px-3 rounded-md transition-all cursor-pointer text-center ${
-                activeTab === 'script'
+              onClick={() => setActiveTab('widget')}
+              className={`flex-1 py-1.5 px-2 rounded-md transition-all cursor-pointer text-center ${
+                activeTab === 'widget'
                   ? 'bg-white text-[#111A3A] shadow-xs'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              Option 1: 1-Line Script (Recommended)
+              Option 1: Direct Script (Recommended)
+            </button>
+            <button
+              onClick={() => setActiveTab('embed')}
+              className={`flex-1 py-1.5 px-2 rounded-md transition-all cursor-pointer text-center ${
+                activeTab === 'embed'
+                  ? 'bg-white text-[#111A3A] shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Option 2: Auto-Resizing Frame
             </button>
             <button
               onClick={() => setActiveTab('iframe')}
-              className={`flex-1 py-1.5 px-3 rounded-md transition-all cursor-pointer text-center ${
+              className={`flex-1 py-1.5 px-2 rounded-md transition-all cursor-pointer text-center ${
                 activeTab === 'iframe'
                   ? 'bg-white text-[#111A3A] shadow-xs'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              Option 2: Pure HTML Snippet
+              Option 3: Pure HTML
             </button>
           </div>
 
-          {activeTab === 'script' ? (
+          {activeTab === 'widget' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-slate-700">Paste in WordPress HFCM plugin:</span>
                 <button
-                  onClick={() => copyToClipboard(scriptCode, 'script')}
+                  onClick={() => copyToClipboard(widgetScriptCode, 'widget')}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#1D8DE6] hover:bg-[#1670b8] text-white text-[11px] font-bold cursor-pointer transition-colors shadow-xs"
                 >
-                  {copiedType === 'script' ? (
+                  {copiedType === 'widget' ? (
                     <>
                       <Check className="w-3 h-3 text-white" />
                       <span>Copied!</span>
@@ -142,13 +149,46 @@ export const EmbedModal: React.FC<EmbedModalProps> = ({ isOpen, onClose }) => {
               </div>
 
               <div className="bg-slate-900 text-emerald-400 p-3 rounded-xl font-['IBM_Plex_Mono'] text-[11px] overflow-x-auto border border-slate-800 select-all">
-                <code>{scriptCode}</code>
+                <code>{widgetScriptCode}</code>
               </div>
               <p className="text-[10px] text-slate-500">
-                This loads the official lightweight loader that automatically configures transparency, permissions, and smooth resizing.
+                ⭐ <strong>Best for WordPress:</strong> Injects the assistant directly into your website without an iframe. Immune to framing restrictions, has zero white background, and grants seamless hands-free microphone voice input!
               </p>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'embed' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-700">Paste in WordPress HFCM plugin:</span>
+                <button
+                  onClick={() => copyToClipboard(embedScriptCode, 'embed')}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#1D8DE6] hover:bg-[#1670b8] text-white text-[11px] font-bold cursor-pointer transition-colors shadow-xs"
+                >
+                  {copiedType === 'embed' ? (
+                    <>
+                      <Check className="w-3 h-3 text-white" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copy Script</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-slate-900 text-emerald-400 p-3 rounded-xl font-['IBM_Plex_Mono'] text-[11px] overflow-x-auto border border-slate-800 select-all">
+                <code>{embedScriptCode}</code>
+              </div>
+              <p className="text-[10px] text-slate-500">
+                Creates an auto-resizing transparent iframe that expands on click and shrinks to a tiny 270x76 floating capsule when minimized.
+              </p>
+            </div>
+          )}
+
+          {activeTab === 'iframe' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-slate-700">Paste into HFCM Snippet content:</span>
@@ -164,17 +204,17 @@ export const EmbedModal: React.FC<EmbedModalProps> = ({ isOpen, onClose }) => {
                   ) : (
                     <>
                       <Copy className="w-3 h-3" />
-                      <span>Copy HTML Snippet</span>
+                      <span>Copy HTML</span>
                     </>
                   )}
                 </button>
               </div>
 
-              <div className="bg-slate-900 text-slate-200 p-3 rounded-xl font-['IBM_Plex_Mono'] text-[10px] leading-relaxed max-h-44 overflow-y-auto border border-slate-800 select-all whitespace-pre">
+              <div className="bg-slate-900 text-slate-200 p-3 rounded-xl font-['IBM_Plex_Mono'] text-[10px] leading-relaxed max-h-40 overflow-y-auto border border-slate-800 select-all whitespace-pre">
                 <code>{iframeHtmlCode}</code>
               </div>
               <p className="text-[10px] text-slate-500">
-                Pure HTML + JS with no external script dependency. Handles live resizing between widget open and closed states.
+                Self-contained HTML snippet with dynamic frame resizing script and transparent backgrounds.
               </p>
             </div>
           )}
@@ -185,7 +225,7 @@ export const EmbedModal: React.FC<EmbedModalProps> = ({ isOpen, onClose }) => {
             <ol className="space-y-1.5 text-[11px] text-slate-600 list-decimal list-inside">
               <li>Open your WordPress Admin &rarr; go to <strong>HFCM</strong> &rarr; <strong>Add New Snippet</strong>.</li>
               <li>Set <strong>Snippet Name</strong> to <em>VisionONE Voice AI</em>, <strong>Location</strong> to <em>Footer</em>, and <strong>Site Display</strong> to <em>Site Wide</em>.</li>
-              <li>Paste the copied code into the <strong>Snippet / Code</strong> box and click <strong>Save</strong>.</li>
+              <li>Paste the code into the <strong>Snippet / Code</strong> box and click <strong>Save</strong>.</li>
             </ol>
           </div>
         </div>
@@ -194,7 +234,7 @@ export const EmbedModal: React.FC<EmbedModalProps> = ({ isOpen, onClose }) => {
         <div className="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex items-center justify-between shrink-0">
           <span className="text-[10px] text-slate-500 flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-            Tested with Header and Footer Code Manager (HFCM)
+            CORS & Frame-Ancestors Enabled
           </span>
           <button
             onClick={onClose}

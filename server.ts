@@ -12,16 +12,19 @@ const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 
-// Comprehensive CORS & Iframe embedding headers (supports WordPress, VP Iframe Assistant, Elementor)
+// Comprehensive CORS & Iframe embedding headers (supports WordPress, HFCM, Elementor, VP Iframe)
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
   res.removeHeader("X-Frame-Options");
   res.header("Content-Security-Policy", "frame-ancestors *;");
   // Grant microphone, autoplay, and audio permissions to iframes embedding this widget
-  res.header("Permissions-Policy", "microphone=*, autoplay=*, clipboard-write=*");
+  res.header("Permissions-Policy", "microphone=*, autoplay=*, clipboard-write=*, camera=*");
   res.header("Feature-Policy", "microphone *; autoplay *");
+  res.header("Cross-Origin-Resource-Policy", "cross-origin");
+  res.header("Cross-Origin-Embedder-Policy", "unsafe-none");
+  res.header("Cross-Origin-Opener-Policy", "unsafe-none");
 
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
@@ -837,19 +840,23 @@ app.post("/api/lead", (req, res) => {
   }
 });
 
-// Universal WordPress HFCM & Website Embed Script Loader
+// Universal WordPress HFCM & Website Embed Script Loader (Iframe with dynamic resizing)
 app.get("/embed.js", (req, res) => {
   res.setHeader("Content-Type", "application/javascript; charset=utf-8");
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Cache-Control", "public, max-age=300");
 
-  const hostUrl = req.protocol + "://" + req.get("host");
+  const proto = req.get("x-forwarded-proto") || req.protocol || "https";
+  const host = req.get("x-forwarded-host") || req.get("host");
+  const hostUrl = `${proto}://${host}`;
 
   const embedScript = `(function() {
   if (window.__VISIONONE_EMBED_INITIALIZED__) return;
   window.__VISIONONE_EMBED_INITIALIZED__ = true;
 
-  var WIDGET_ORIGIN = "${hostUrl}";
+  var currentScript = document.currentScript;
+  var scriptSrc = (currentScript && currentScript.src) ? currentScript.src : "";
+  var WIDGET_ORIGIN = scriptSrc ? new URL(scriptSrc).origin : "${hostUrl}".replace(/^http:\\/\\//, 'https://');
   var isOpen = false;
 
   var container = document.createElement("div");
@@ -874,6 +881,7 @@ app.get("/embed.js", (req, res) => {
   iframe.title = "VisionONE Voice AI Assistant";
   iframe.allow = "microphone *; autoplay *; clipboard-write *";
   iframe.setAttribute("allowtransparency", "true");
+  iframe.setAttribute("frameborder", "0");
   iframe.style.width = "100%";
   iframe.style.height = "100%";
   iframe.style.border = "none";
@@ -953,6 +961,300 @@ app.get("/embed.js", (req, res) => {
   return res.send(embedScript);
 });
 
+// Standalone Direct In-Page Embed Loader (Zero Iframe, Native DOM Injection for 100% Embeddability)
+app.get("/widget.js", (req, res) => {
+  res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cache-Control", "public, max-age=300");
+
+  const proto = req.get("x-forwarded-proto") || req.protocol || "https";
+  const host = req.get("x-forwarded-host") || req.get("host");
+  const hostUrl = `${proto}://${host}`;
+
+  const widgetScript = `(function() {
+  if (window.__VISIONONE_INPAGE_INITIALIZED__) return;
+  window.__VISIONONE_INPAGE_INITIALIZED__ = true;
+
+  var currentScript = document.currentScript;
+  var scriptSrc = (currentScript && currentScript.src) ? currentScript.src : "";
+  var API_BASE = scriptSrc ? new URL(scriptSrc).origin : "${hostUrl}".replace(/^http:\\/\\//, 'https://');
+
+  // Inject scoped styles
+  var style = document.createElement("style");
+  style.id = "v1-voice-widget-styles";
+  style.textContent = \`
+    #v1-voice-widget-root { position: fixed; bottom: 20px; right: 20px; z-index: 99999999; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; pointer-events: none; }
+    #v1-voice-capsule { pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 9999px; background: linear-gradient(135deg, #111A3A 0%, #1D8DE6 60%, #35A6F7 100%); color: #fff; cursor: pointer; box-shadow: 0 10px 25px -5px rgba(29, 141, 230, 0.4), 0 8px 10px -6px rgba(17, 26, 58, 0.3); border: 1px solid rgba(255,255,255,0.25); transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s; user-select: none; }
+    #v1-voice-capsule:hover { transform: scale(1.04); box-shadow: 0 15px 30px -5px rgba(29, 141, 230, 0.5); }
+    #v1-voice-capsule:active { transform: scale(0.97); }
+    .v1-mic-badge { width: 32px; height: 32px; border-radius: 9999px; background: rgba(255,255,255,0.22); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .v1-mic-badge svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .v1-text-main { font-size: 13px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; }
+    .v1-text-sub { font-size: 10px; color: #E5F0FE; opacity: 0.9; }
+    #v1-voice-panel { pointer-events: auto; display: none; width: 380px; max-width: calc(100vw - 32px); height: 620px; max-height: calc(100vh - 40px); background: #ffffff; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(17, 26, 58, 0.35), 0 0 0 1px rgba(0,0,0,0.08); flex-direction: column; overflow: hidden; animation: v1PopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes v1PopIn { 0% { opacity: 0; transform: scale(0.95) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+    .v1-panel-header { background: #111A3A; padding: 14px 16px; color: #fff; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .v1-header-title { font-size: 14px; font-weight: 700; }
+    .v1-header-sub { font-size: 10px; color: #35A6F7; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+    .v1-header-btn { background: rgba(255,255,255,0.15); border: none; color: #fff; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+    .v1-header-btn:hover { background: rgba(255,255,255,0.25); }
+    .v1-orb-area { padding: 24px 16px 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 30%, rgba(29, 141, 230, 0.08) 0%, transparent 70%); }
+    .v1-orb { width: 88px; height: 88px; border-radius: 9999px; background: linear-gradient(135deg, #111A3A, #1D8DE6, #35A6F7); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 35px rgba(29, 141, 230, 0.4); transition: transform 0.2s; cursor: pointer; }
+    .v1-orb svg { width: 36px; height: 36px; stroke: #fff; fill: none; stroke-width: 2; }
+    .v1-orb.listening { animation: v1Pulse 1.5s infinite; }
+    @keyframes v1Pulse { 0% { box-shadow: 0 0 0 0 rgba(29, 141, 230, 0.6); } 70% { box-shadow: 0 0 0 20px rgba(29, 141, 230, 0); } 100% { box-shadow: 0 0 0 0 rgba(29, 141, 230, 0); } }
+    .v1-status-pill { margin-top: 12px; font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 9999px; background: #E5F0FE; color: #1D8DE6; }
+    .v1-transcript-box { flex: 1; padding: 12px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+    .v1-msg { max-width: 85%; padding: 10px 14px; border-radius: 14px; line-height: 1.4; word-break: break-word; }
+    .v1-msg-ai { align-self: flex-start; background: #F1F5F9; color: #111A3A; border-bottom-left-radius: 4px; }
+    .v1-msg-user { align-self: flex-end; background: #1D8DE6; color: #fff; border-bottom-right-radius: 4px; }
+    .v1-suggested-row { padding: 8px 14px; display: flex; gap: 6px; overflow-x: auto; flex-shrink: 0; background: #FAFAFA; border-top: 1px solid #E2E8F0; }
+    .v1-chip { font-size: 10px; font-weight: 500; background: #fff; border: 1px solid #CBD5E1; color: #1E293B; padding: 5px 10px; border-radius: 9999px; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+    .v1-chip:hover { border-color: #1D8DE6; background: #E5F0FE; color: #1D8DE6; }
+    .v1-footer-bar { padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #64748B; border-top: 1px solid #E2E8F0; background: #fff; }
+  \`;
+  document.head.appendChild(style);
+
+  // Widget DOM
+  var root = document.createElement("div");
+  root.id = "v1-voice-widget-root";
+  root.innerHTML = \`
+    <div id="v1-voice-capsule">
+      <div class="v1-mic-badge">
+        <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+      </div>
+      <div>
+        <div class="v1-text-main">VisionONE Voice AI</div>
+        <div class="v1-text-sub">Click to speak hands-free</div>
+      </div>
+    </div>
+
+    <div id="v1-voice-panel">
+      <div class="v1-panel-header">
+        <div>
+          <div class="v1-header-title">VisionONE Access AI</div>
+          <div class="v1-header-sub"><span>●</span> Hands-Free Voice Assistant</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button id="v1-btn-minimize" class="v1-header-btn" title="Minimize">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="v1-orb-area">
+        <div id="v1-orb-btn" class="v1-orb">
+          <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        </div>
+        <div id="v1-status-pill" class="v1-status-pill">Ready • Tap to speak</div>
+      </div>
+
+      <div id="v1-transcript" class="v1-transcript-box">
+        <div class="v1-msg v1-msg-ai">Hello! I am your Vision One AI assistant. How can I help you today with your ERP, finance, payroll, or business operations?</div>
+      </div>
+
+      <div id="v1-suggested" class="v1-suggested-row">
+        <button class="v1-chip" data-q="What modules are in VisionONE ERP?">What modules are in VisionONE?</button>
+        <button class="v1-chip" data-q="Tell me about HR & Payroll">HR & Payroll</button>
+        <button class="v1-chip" data-q="How does eTIMS compliance work?">KRA eTIMS Compliance</button>
+        <button class="v1-chip" data-q="Book a live walkthrough">Book a Live Demo</button>
+      </div>
+
+      <div class="v1-footer-bar">
+        <span>VisionONE Access Enterprise</span>
+        <span>Continuous Voice AI</span>
+      </div>
+    </div>
+  \`;
+  document.body.appendChild(root);
+
+  var capsule = document.getElementById("v1-voice-capsule");
+  var panel = document.getElementById("v1-voice-panel");
+  var btnMin = document.getElementById("v1-btn-minimize");
+  var orbBtn = document.getElementById("v1-orb-btn");
+  var statusPill = document.getElementById("v1-status-pill");
+  var transcriptBox = document.getElementById("v1-transcript");
+  var suggestedBox = document.getElementById("v1-suggested");
+
+  var isOpen = false;
+  var isListening = false;
+  var recognition = null;
+  var history = [];
+  var currentAudio = null;
+
+  function appendMsg(role, text) {
+    var d = document.createElement("div");
+    d.className = "v1-msg " + (role === "user" ? "v1-msg-user" : "v1-msg-ai");
+    d.textContent = text;
+    transcriptBox.appendChild(d);
+    transcriptBox.scrollTop = transcriptBox.scrollHeight;
+    history.push({ role: role, text: text });
+  }
+
+  function speakText(text, audioUrl, callback) {
+    statusPill.textContent = "Speaking...";
+    orbBtn.classList.remove("listening");
+
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
+
+    if (audioUrl) {
+      currentAudio = new Audio(audioUrl);
+      currentAudio.onended = function() {
+        callback && callback();
+      };
+      currentAudio.onerror = function() {
+        speakFallback(text, callback);
+      };
+      currentAudio.play().catch(function() {
+        speakFallback(text, callback);
+      });
+    } else {
+      speakFallback(text, callback);
+    }
+  }
+
+  function speakFallback(text, callback) {
+    if (!window.speechSynthesis) {
+      callback && callback();
+      return;
+    }
+    window.speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.0;
+    u.onend = function() { callback && callback(); };
+    u.onerror = function() { callback && callback(); };
+    window.speechSynthesis.speak(u);
+  }
+
+  function initRecognition() {
+    var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) return null;
+    var rec = new SpeechRec();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.lang = "en-US";
+
+    rec.onstart = function() {
+      isListening = true;
+      statusPill.textContent = "Listening hands-free...";
+      orbBtn.classList.add("listening");
+    };
+
+    rec.onresult = function(e) {
+      var text = e.results[0][0].transcript;
+      if (text && text.trim()) {
+        processMessage(text.trim());
+      }
+    };
+
+    rec.onerror = function() {
+      isListening = false;
+      orbBtn.classList.remove("listening");
+      statusPill.textContent = "Tap orb to speak";
+    };
+
+    rec.onend = function() {
+      isListening = false;
+      orbBtn.classList.remove("listening");
+    };
+
+    return rec;
+  }
+
+  function startListen() {
+    if (!recognition) recognition = initRecognition();
+    if (!recognition) {
+      statusPill.textContent = "Microphone not supported";
+      return;
+    }
+    try {
+      recognition.start();
+    } catch(err) {}
+  }
+
+  function processMessage(msg) {
+    appendMsg("user", msg);
+    statusPill.textContent = "Thinking...";
+
+    fetch(API_BASE + "/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: msg, history: history.slice(-6) })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      appendMsg("assistant", data.text);
+      if (data.suggestedQuestions && data.suggestedQuestions.length) {
+        suggestedBox.innerHTML = "";
+        data.suggestedQuestions.forEach(function(q) {
+          var b = document.createElement("button");
+          b.className = "v1-chip";
+          b.textContent = q;
+          b.onclick = function() { processMessage(q); };
+          suggestedBox.appendChild(b);
+        });
+      }
+      speakText(data.voiceText || data.text, data.audioUrl, function() {
+        if (!data.isConversationOver) {
+          startListen();
+        } else {
+          statusPill.textContent = "Conversation Complete";
+        }
+      });
+    })
+    .catch(function() {
+      appendMsg("assistant", "VisionONE Access connects finance, payroll, and operations into one platform. Would you like to schedule a demo?");
+      speakFallback("Vision One connects your operations. Would you like to schedule a demo?", function() {
+        startListen();
+      });
+    });
+  }
+
+  function openWidget() {
+    isOpen = true;
+    capsule.style.display = "none";
+    panel.style.display = "flex";
+
+    // Initial greeting
+    speakText("Hello! I am your Vision One AI assistant. How can I help you today with your ERP, finance, payroll, or business operations?", null, function() {
+      startListen();
+    });
+  }
+
+  function closeWidget() {
+    isOpen = false;
+    panel.style.display = "none";
+    capsule.style.display = "flex";
+    if (currentAudio) currentAudio.pause();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (recognition && isListening) {
+      try { recognition.stop(); } catch(e){}
+    }
+  }
+
+  capsule.onclick = openWidget;
+  btnMin.onclick = closeWidget;
+  orbBtn.onclick = function() {
+    if (isListening) {
+      try { recognition.stop(); } catch(e){}
+    } else {
+      startListen();
+    }
+  };
+
+  suggestedBox.querySelectorAll(".v1-chip").forEach(function(b) {
+    b.onclick = function() {
+      processMessage(b.getAttribute("data-q"));
+    };
+  });
+})();`;
+
+  return res.send(widgetScript);
+});
+
 async function startServer() {
   const isProd = process.env.NODE_ENV === "production";
   const distPath = path.join(process.cwd(), "dist");
@@ -961,7 +1263,7 @@ async function startServer() {
   if (isProd && hasDist) {
     app.use(express.static(distPath));
     app.get("*", (req, res, next) => {
-      if (req.path.startsWith("/api/") || req.path === "/embed.js") {
+      if (req.path.startsWith("/api/") || req.path === "/embed.js" || req.path === "/widget.js") {
         return next();
       }
       res.sendFile(path.join(distPath, "index.html"));
