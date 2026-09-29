@@ -17,6 +17,8 @@ interface AssistantPanelProps {
   isAutoplayBlocked?: boolean;
   onReset: () => void;
   onClose?: () => void;
+  onMinimize?: () => void;
+  onOpenEmbedGuide?: () => void;
   onToggleMute: () => void;
   onToggleMic: () => void;
   onRetry: () => void;
@@ -41,6 +43,8 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   isAutoplayBlocked = false,
   onReset,
   onClose,
+  onMinimize,
+  onOpenEmbedGuide,
   onToggleMute,
   onToggleMic,
   onRetry,
@@ -65,7 +69,9 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
         onReset={onReset}
         voiceSettings={voiceSettings}
         onToggleMute={onToggleMute}
+        onMinimize={onMinimize}
         onClose={onClose}
+        onOpenEmbedGuide={onOpenEmbedGuide}
         qaScore={currentQaScore}
       />
 

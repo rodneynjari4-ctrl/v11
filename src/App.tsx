@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { VoiceState, ChatMessage, VoiceSettings, LeadFormData } from './types';
 import { AssistantPanel } from './components/AssistantPanel';
 import { LeadModal } from './components/LeadModal';
+import { EmbedModal } from './components/EmbedModal';
 import { SpeechRecognitionManager, SpeechSynthesisManager } from './lib/speech';
-import { Mic, Sparkles } from 'lucide-react';
+import { Mic } from 'lucide-react';
 
 const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome-msg',
@@ -22,7 +23,9 @@ const INITIAL_WELCOME_MESSAGE: ChatMessage = {
 };
 
 export default function App() {
-  const [isOpen, setIsOpen] = useState<boolean>(true);
+  // Widget states: Starts CLOSED and not dismissed
+  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isDismissed, setIsDismissed] = useState<boolean>(false);
   const [hasStarted, setHasStarted] = useState<boolean>(false);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [isAutoListening, setIsAutoListening] = useState<boolean>(true);
@@ -36,11 +39,12 @@ export default function App() {
     INITIAL_WELCOME_MESSAGE.suggestedQuestions || []
   );
 
-  // Lead capture modal
+  // Modals
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [leadModalType, setLeadModalType] = useState<'demo' | 'quote' | 'contact'>('demo');
+  const [isEmbedModalOpen, setIsEmbedModalOpen] = useState(false);
 
-  // Articulate natural warm male voice settings
+  // Voice settings
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
     isMuted: false,
     rate: 0.98,
@@ -52,6 +56,7 @@ export default function App() {
   const speechRecognitionRef = useRef<SpeechRecognitionManager | null>(null);
   const speechSynthesisRef = useRef<SpeechSynthesisManager | null>(null);
   const animFrameRef = useRef<number | null>(null);
+  const cachedWelcomeAudioUrlRef = useRef<string | null>(null);
   const isAutoListeningRef = useRef<boolean>(true);
   isAutoListeningRef.current = isAutoListening;
   const isConversationOverRef = useRef<boolean>(false);
@@ -60,7 +65,6 @@ export default function App() {
 
   // Safe microphone speech recognition starter for continuous hands-free conversation
   const startListening = useCallback(async () => {
-    // Interruption logic: halt active voice playback immediately
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.stop();
     }
@@ -76,7 +80,6 @@ export default function App() {
     }
 
     setVoiceState('listening');
-
     speechRecognitionRef.current.resumeListeningAfterAgentTurn();
 
     speechRecognitionRef.current.start(
@@ -115,11 +118,18 @@ export default function App() {
 
   // Neural Voice Synthesizer with Automatic Continuous Turn-Taking
   const speakVoice = useCallback(
-    async (text: string, autoListenAfter = true, audioUrl?: string | null) => {
+    async (
+      text: string,
+      autoListenAfter = true,
+      audioUrl?: string | null,
+      onFinishCallback?: () => void
+    ) => {
       if (voiceSettings.isMuted || !text) {
         setVoiceState('idle');
         setActivePlayingText(null);
-        if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
+        if (onFinishCallback) {
+          onFinishCallback();
+        } else if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
           startListening();
         }
         return;
@@ -142,8 +152,10 @@ export default function App() {
           },
           onEnd: () => {
             setActivePlayingText(null);
-            // AUTOMATIC CONTINUOUS LOOP: immediately resume listening hands-free if not conversation over!
-            if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
+            if (onFinishCallback) {
+              onFinishCallback();
+            } else if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
+              // AUTOMATIC CONTINUOUS LOOP: immediately resume listening hands-free!
               startListening();
             } else {
               setVoiceState('idle');
@@ -151,7 +163,9 @@ export default function App() {
           },
           onError: () => {
             setActivePlayingText(null);
-            if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
+            if (onFinishCallback) {
+              onFinishCallback();
+            } else if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
               startListening();
             } else {
               setVoiceState('idle');
@@ -165,7 +179,9 @@ export default function App() {
       } else {
         setVoiceState('idle');
         setActivePlayingText(null);
-        if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
+        if (onFinishCallback) {
+          onFinishCallback();
+        } else if (autoListenAfter && isAutoListeningRef.current && !isConversationOverRef.current) {
           startListening();
         }
       }
@@ -173,29 +189,14 @@ export default function App() {
     [voiceSettings, startListening]
   );
 
-  // Automatic Start & Self-Introduction on Mount
+  // Background initialization & audio caching on Mount (WITHOUT auto-starting speech!)
   useEffect(() => {
     speechRecognitionRef.current = new SpeechRecognitionManager();
     speechSynthesisRef.current = new SpeechSynthesisManager();
 
     let isMounted = true;
-    let hasSpokenIntro = false;
 
-    const introduce = (audioUrl?: string) => {
-      if (!isMounted) return;
-      hasSpokenIntro = true;
-      setHasStarted(true);
-      setIsAutoListening(true);
-      setIsConversationOver(false);
-      setIsAutoplayBlocked(false);
-      speakVoice(
-        INITIAL_WELCOME_MESSAGE.voiceText || INITIAL_WELCOME_MESSAGE.text,
-        true,
-        audioUrl
-      );
-    };
-
-    // Pre-cache high-definition neural voice for the welcome message & introduce automatically
+    // Pre-cache neural voice for the welcome message so it plays immediately on widget click
     fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -208,31 +209,15 @@ export default function App() {
       .then((data) => {
         if (!isMounted) return;
         if (data.audioUrl) {
+          cachedWelcomeAudioUrlRef.current = data.audioUrl;
           setMessages((prev) =>
             prev.map((m) => (m.id === 'welcome-msg' ? { ...m, audioUrl: data.audioUrl } : m))
           );
         }
-        // Start voice assistant automatically and let agent introduce himself out loud!
-        introduce(data.audioUrl);
       })
       .catch(() => {
-        if (!isMounted) return;
-        introduce();
+        // Fallback to browser synthesis if pre-cache fails
       });
-
-    // Fallback: If browser autoplay policy requires user gesture, unlock and start on first click/pointerdown
-    const unlockAndStart = () => {
-      if (speechSynthesisRef.current) {
-        speechSynthesisRef.current.resume();
-      }
-      setIsAutoplayBlocked(false);
-      if (!hasSpokenIntro) {
-        introduce();
-      }
-    };
-
-    window.addEventListener('pointerdown', unlockAndStart, { once: true });
-    window.addEventListener('click', unlockAndStart, { once: true });
 
     return () => {
       isMounted = false;
@@ -241,10 +226,8 @@ export default function App() {
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
-      window.removeEventListener('pointerdown', unlockAndStart);
-      window.removeEventListener('click', unlockAndStart);
     };
-  }, [speakVoice]);
+  }, []);
 
   // Monitor Mic Amplitude loop when listening or speaking
   useEffect(() => {
@@ -280,12 +263,69 @@ export default function App() {
     };
   }, [voiceState]);
 
+  // Complete close / dismiss handler: completely closes widget, stops audio, hides completely
+  const handleDismissCompletely = useCallback(() => {
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.stop();
+    }
+    if (speechRecognitionRef.current) {
+      speechRecognitionRef.current.stop();
+    }
+    setVoiceState('idle');
+    setLiveTranscript('');
+    setIsAutoListening(false);
+    setIsOpen(false);
+    setIsDismissed(true);
+
+    try {
+      if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+        window.parent.postMessage(
+          {
+            type: 'VISIONONE_WIDGET_STATE',
+            isOpen: false,
+            isClosedCompletely: true,
+            dimensions: { width: 0, height: 0 },
+          },
+          '*'
+        );
+      }
+    } catch {}
+  }, []);
+
+  // Minimize handler: collapses from panel to compact floating capsule
+  const handleMinimizeAssistant = useCallback(() => {
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.stop();
+    }
+    if (speechRecognitionRef.current) {
+      speechRecognitionRef.current.stop();
+    }
+    setVoiceState('idle');
+    setLiveTranscript('');
+    setIsAutoListening(false);
+    setIsOpen(false);
+    setIsDismissed(false);
+
+    try {
+      if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+        window.parent.postMessage(
+          {
+            type: 'VISIONONE_WIDGET_STATE',
+            isOpen: false,
+            isClosedCompletely: false,
+            dimensions: { width: 270, height: 76 },
+          },
+          '*'
+        );
+      }
+    } catch {}
+  }, []);
+
   // Send message to server-side AI
   const processUserMessage = async (userText: string) => {
     const trimmed = userText.trim();
     if (!trimmed) return;
 
-    // Pause recognition and stop any speech while processing AI turn
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.stop();
     }
@@ -320,6 +360,8 @@ export default function App() {
       const data = await res.json();
 
       const isOver = Boolean(data.isConversationOver);
+      const shouldClose = Boolean(data.shouldCloseWidget);
+
       if (isOver) {
         setIsConversationOver(true);
         setIsAutoListening(false);
@@ -334,6 +376,7 @@ export default function App() {
         timestamp: Date.now(),
         intent: data.intent,
         isConversationOver: isOver,
+        shouldCloseWidget: shouldClose,
         qaScore: data.qaScore,
         qaCritique: data.qaCritique,
         cta: data.cta,
@@ -345,10 +388,19 @@ export default function App() {
         setSuggestedQuestions(data.suggestedQuestions);
       }
 
-      // Automatically speak the response
-      // If conversation is over: do NOT auto-listen after farewell!
       const spoken = data.voiceText || data.text;
-      speakVoice(spoken, !isOver, data.audioUrl);
+
+      if (shouldClose) {
+        // User asked to close by voice: speak the brief goodbye, then close widget completely!
+        speakVoice(spoken, false, data.audioUrl, () => {
+          setTimeout(() => {
+            handleDismissCompletely();
+          }, 400);
+        });
+      } else {
+        // Continue hands-free conversation if not over!
+        speakVoice(spoken, !isOver, data.audioUrl);
+      }
     } catch (err) {
       console.warn('Chat request fallback notice:', err);
       setVoiceState('idle');
@@ -376,16 +428,11 @@ export default function App() {
     }
   };
 
-  // Keep ref up to date
   processUserMessageRef.current = processUserMessage;
 
-  // Toggle or start mic
   const toggleMic = () => {
     if (!hasStarted) {
-      setHasStarted(true);
-      setIsAutoListening(true);
-      setIsConversationOver(false);
-      startListening();
+      handleOpenAssistant();
       return;
     }
 
@@ -395,22 +442,23 @@ export default function App() {
     }
 
     if (voiceState === 'listening') {
-      // User tapped while listening -> Pause listening
       setIsAutoListening(false);
       stopListening();
     } else if (voiceState === 'speaking') {
-      // User tapped while AI was speaking -> Interrupt speech and listen immediately
       speechSynthesisRef.current?.stop();
       setIsAutoListening(true);
       startListening();
     } else {
-      // Idle/paused -> Resume automatic listening
       setIsAutoListening(true);
       startListening();
     }
   };
 
   const handleSelectQuestion = (question: string) => {
+    if (!isOpen) {
+      setIsOpen(true);
+      setIsDismissed(false);
+    }
     setHasStarted(true);
     setIsAutoListening(true);
     setIsConversationOver(false);
@@ -435,34 +483,27 @@ export default function App() {
     speakVoice(
       INITIAL_WELCOME_MESSAGE.voiceText || INITIAL_WELCOME_MESSAGE.text,
       true,
-      INITIAL_WELCOME_MESSAGE.audioUrl
+      cachedWelcomeAudioUrlRef.current || INITIAL_WELCOME_MESSAGE.audioUrl
     );
   };
 
-  const handleCloseAssistant = () => {
-    if (speechSynthesisRef.current) {
-      speechSynthesisRef.current.stop();
-    }
-    if (speechRecognitionRef.current) {
-      speechRecognitionRef.current.stop();
-    }
-    setVoiceState('idle');
-    setLiveTranscript('');
-    setIsAutoListening(false);
-    setIsOpen(false);
-  };
-
+  // Triggered when user CLICKS the widget button: Opens widget and starts the voice!
   const handleOpenAssistant = () => {
+    setIsDismissed(false);
     setIsOpen(true);
     setIsAutoListening(true);
-    if (!hasStarted) {
-      setHasStarted(true);
-      speakVoice(
-        INITIAL_WELCOME_MESSAGE.voiceText || INITIAL_WELCOME_MESSAGE.text,
-        true,
-        INITIAL_WELCOME_MESSAGE.audioUrl
-      );
+    setIsConversationOver(false);
+
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.resume();
     }
+
+    setHasStarted(true);
+    speakVoice(
+      INITIAL_WELCOME_MESSAGE.voiceText || INITIAL_WELCOME_MESSAGE.text,
+      true,
+      cachedWelcomeAudioUrlRef.current || INITIAL_WELCOME_MESSAGE.audioUrl
+    );
   };
 
   const handleLeadSubmit = async (leadData: LeadFormData): Promise<boolean> => {
@@ -490,20 +531,78 @@ export default function App() {
     }
   };
 
+  // Cross-frame parent window synchronization for WordPress HFCM iframe embeds
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+        window.parent.postMessage(
+          {
+            type: 'VISIONONE_WIDGET_STATE',
+            isOpen,
+            isClosedCompletely: isDismissed,
+            dimensions: isOpen
+              ? { width: 395, height: 670 }
+              : isDismissed
+              ? { width: 0, height: 0 }
+              : { width: 270, height: 76 },
+          },
+          '*'
+        );
+      }
+    } catch {
+      // Ignore cross-frame errors
+    }
+  }, [isOpen, isDismissed]);
+
+  // Listen for parent messages from WordPress site
+  useEffect(() => {
+    const handleParentMsg = (event: MessageEvent) => {
+      if (!event.data || typeof event.data !== 'object') return;
+      if (event.data.action === 'OPEN_VISIONONE_WIDGET') {
+        handleOpenAssistant();
+      } else if (event.data.action === 'CLOSE_COMPLETELY') {
+        handleDismissCompletely();
+      } else if (event.data.action === 'CLOSE_VISIONONE_WIDGET') {
+        handleMinimizeAssistant();
+      }
+    };
+    window.addEventListener('message', handleParentMsg);
+    return () => window.removeEventListener('message', handleParentMsg);
+  }, [handleOpenAssistant, handleDismissCompletely, handleMinimizeAssistant]);
+
   return (
     <div
-      className={`w-full h-[100dvh] relative flex items-center justify-center p-0 sm:p-4 overflow-hidden transition-colors duration-300 ${
-        isOpen ? 'bg-slate-100 text-[#111A3A]' : 'bg-transparent pointer-events-none'
+      className={`fixed inset-0 flex flex-col justify-end items-end p-2 sm:p-3 select-none overflow-hidden font-['Inter'] transition-colors duration-200 ${
+        isOpen ? 'pointer-events-auto' : 'pointer-events-none'
       }`}
+      style={{ background: 'transparent' }}
     >
-      {/* Subtle clean neutral backdrop when open */}
-      {isOpen && (
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200/70 pointer-events-none" />
+      {/* Launcher State (Floating Capsule) */}
+      {!isOpen && (
+        <div className="pointer-events-auto flex items-end justify-end animate-in fade-in zoom-in-95 duration-200">
+          <button
+            onClick={handleOpenAssistant}
+            className="group flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#111A3A] via-[#1D8DE6] to-[#35A6F7] text-white shadow-2xl hover:shadow-cyan-500/40 hover:scale-105 active:scale-95 transition-all cursor-pointer border border-white/20"
+            aria-label="Open VisionONE Voice Assistant"
+          >
+            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors shrink-0">
+              <Mic className="w-4 h-4 text-white animate-pulse" />
+            </div>
+            <div className="text-left pr-1">
+              <span className="block text-xs font-bold font-['Sora'] leading-tight whitespace-nowrap">
+                VisionONE Voice AI
+              </span>
+              <span className="block text-[10px] text-[#E5F0FE] font-['Inter'] whitespace-nowrap">
+                Click to speak hands-free
+              </span>
+            </div>
+          </button>
+        </div>
       )}
 
-      {/* Main Assistant View when open */}
+      {/* Main Assistant Window when Open */}
       {isOpen && (
-        <main className="relative z-10 w-full h-full sm:h-[88vh] sm:max-h-[660px] sm:max-w-[380px] flex flex-col justify-center items-center pointer-events-auto">
+        <main className="relative z-10 w-full h-full sm:h-[88vh] sm:max-h-[660px] sm:max-w-[390px] flex flex-col justify-center items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200 shadow-2xl rounded-none sm:rounded-2xl overflow-hidden border border-slate-200/90">
           <AssistantPanel
             voiceState={voiceState}
             messages={messages}
@@ -517,7 +616,8 @@ export default function App() {
             isAutoplayBlocked={isAutoplayBlocked}
             onReset={handleRestartConversation}
             onRestartConversation={handleRestartConversation}
-            onClose={handleCloseAssistant}
+            onMinimize={handleMinimizeAssistant}
+            onOpenEmbedGuide={() => setIsEmbedModalOpen(true)}
             onToggleMute={() => {
               if (!voiceSettings.isMuted) {
                 speechSynthesisRef.current?.stop();
@@ -538,31 +638,18 @@ export default function App() {
         </main>
       )}
 
-      {/* Persistent discreet floating launcher button when closed */}
-      {!isOpen && (
-        <div className="fixed bottom-5 right-5 z-50 pointer-events-auto">
-          <button
-            onClick={handleOpenAssistant}
-            className="group flex items-center gap-3 px-4 py-3 rounded-full bg-gradient-to-r from-[#111A3A] to-[#1D8DE6] text-white shadow-2xl hover:shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer border border-white/20"
-            aria-label="Open VisionONE Voice Assistant"
-          >
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
-              <Mic className="w-4 h-4 text-white animate-pulse" />
-            </div>
-            <div className="text-left pr-1">
-              <span className="block text-xs font-bold font-['Sora'] leading-tight">VisionONE AI</span>
-              <span className="block text-[10px] text-[#E5F0FE] font-['Inter']">Tap to open voice</span>
-            </div>
-          </button>
-        </div>
-      )}
-
       {/* Lead Capture Modal */}
       <LeadModal
         isOpen={isLeadModalOpen}
         onClose={() => setIsLeadModalOpen(false)}
         onSubmit={handleLeadSubmit}
         initialType={leadModalType}
+      />
+
+      {/* WordPress HFCM Embed Code & Setup Guide Modal */}
+      <EmbedModal
+        isOpen={isEmbedModalOpen}
+        onClose={() => setIsEmbedModalOpen(false)}
       />
     </div>
   );

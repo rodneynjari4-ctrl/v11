@@ -13,6 +13,7 @@ export interface ChatMessage {
   timestamp: number;
   intent?: string;
   isConversationOver?: boolean;
+  shouldCloseWidget?: boolean;
   qaScore?: number;
   qaCritique?: string;
   suggestedQuestions?: string[];

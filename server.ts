@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
@@ -7,7 +8,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 
@@ -167,72 +168,88 @@ LEAD QUALIFICATION & SALES INTENT:
 Always return a valid JSON object strictly matching the schema.`;
 
 // Helper to identify if user is genuinely and intuitively ending or concluding the conversation
-function isConversationEndingIntent(message: string): boolean {
-  const clean = (message || "")
+// Helper to accurately identify genuine conversation ending intent (avoiding false positives like "close books")
+function isConversationEndingIntent(message: string): { isEnding: boolean; shouldCloseWidget: boolean } {
+  const clean = (message || '')
     .toLowerCase()
     .trim()
-    .replace(/[.,!?;:'"()[\]{}]/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/[.,!?;:'"()[\]{}]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 
-  const exactEndings = [
-    "bye",
-    "goodbye",
-    "bye bye",
-    "im done",
-    "i am done",
-    "thats all",
-    "that is all",
-    "no more questions",
-    "no more question",
-    "nothing else",
-    "exit",
-    "quit",
-    "close",
-    "close widget",
-    "no thats it",
-    "no that is it",
-    "thanks im good",
-    "thanks im all good",
-    "thank you thats all",
-    "thank you that is all",
-    "all done",
-    "all set",
-    "were done",
-    "we are done",
-    "have a nice day",
-    "have a good day",
-    "see you later",
-    "talk to you later",
-    "nope thats all",
-    "no thank you thats all",
-    "im finished",
-    "i am finished",
-    "no more help needed",
-    "no further questions",
-    "i have no more questions",
-    "done for now",
-    "thats all thank you",
-    "that is all thank you",
-    "thats everything thank you",
-    "that is everything thank you",
-    "thank you bye",
-    "thanks bye",
+  if (!clean) return { isEnding: false, shouldCloseWidget: false };
+
+  // Explicit close / exit commands
+  const explicitClosePatterns = [
+    'close',
+    'close it',
+    'close this',
+    'close widget',
+    'close the widget',
+    'close assistant',
+    'close the assistant',
+    'close window',
+    'close the window',
+    'please close',
+    'exit',
+    'quit',
+    'shut down',
+    'dismiss',
   ];
 
-  if (
-    exactEndings.some(
-      (e) =>
-        clean === e ||
-        clean.startsWith(e + " ") ||
-        clean.endsWith(" " + e) ||
-        clean.includes(" " + e + " ")
-    )
-  ) {
-    return true;
+  if (explicitClosePatterns.some((p) => clean === p || clean === `please ${p}` || clean === `${p} please` || clean === `${p} now`)) {
+    return { isEnding: true, shouldCloseWidget: true };
   }
 
-  return false;
+  // Conversation farewells & conclusion intents
+  const endingPhrases = [
+    'bye',
+    'goodbye',
+    'bye bye',
+    'bye for now',
+    'see you',
+    'see you later',
+    'talk to you later',
+    'have a good day',
+    'have a nice day',
+    'have a great day',
+    'i am done',
+    'im done',
+    'we are done',
+    'were done',
+    'i am finished',
+    'im finished',
+    'all done',
+    'all set',
+    'im all set',
+    'that is all',
+    'thats all',
+    'that will be all',
+    'thats all thank you',
+    'that is all thank you',
+    'thats all thanks',
+    'that is all thanks',
+    'thats everything',
+    'that is everything',
+    'thats everything thank you',
+    'nothing else',
+    'nothing else thank you',
+    'nothing else thanks',
+    'no more questions',
+    'no further questions',
+    'i have no more questions',
+    'no thank you thats all',
+    'no thanks thats all',
+    'no thats it',
+    'no that is it',
+    'done for now',
+  ];
+
+  const isEnding = endingPhrases.some(
+    (p) => clean === p || clean.startsWith(p + ' ') || clean.endsWith(' ' + p)
+  );
+
+  return { isEnding, shouldCloseWidget: false };
 }
 
 const CRITIC_SYSTEM_INSTRUCTION = `You are the Senior QA & Quality Critic Agent for VisionONE Access AI.
@@ -266,6 +283,7 @@ CRITERIA FOR QA EVALUATION:
 interface CriticEvaluation {
   qaScore: number;
   isConversationOver: boolean;
+  shouldCloseWidget?: boolean;
   critiqueSummary: string;
   improvedText: string;
   improvedVoiceText: string;
@@ -280,41 +298,49 @@ function runRuleBasedCritic(
     intent?: string;
   }
 ): CriticEvaluation {
-  const isEnding = isConversationEndingIntent(userMessage);
+  const { isEnding, shouldCloseWidget } = isConversationEndingIntent(userMessage);
 
-  let voice = (candidate.voiceText || candidate.text || "")
-    .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
-    .replace(/[*_#`~>]/g, "")
-    .replace(/https?:\/\/\S+/gi, "our website")
-    .replace(/\bERP\b/g, "E-R-P")
-    .replace(/\b(M-Pesa|MPesa|M-PESA|MPESA)\b/g, "Em-Pesa")
-    .replace(/\b(eTIMS|ETIMS)\b/g, "ee-Tims")
-    .replace(/\bKRA\b/g, "K-R-A")
-    .replace(/\bVisionONE\b/g, "Vision One")
-    .replace(/\bHR\/Payroll\b/gi, "H-R and Payroll")
-    .replace(/\bHR\b/g, "H-R")
-    .replace(/\bSTK Push\b/gi, "S-T-K Push")
-    .replace(/\bPayBill\b/gi, "Pay Bill")
-    .replace(/&/g, "and")
-    .replace(/%/g, "percent")
-    .replace(/\s+/g, " ")
+  let voice = (candidate.voiceText || candidate.text || '')
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+    .replace(/[*_#`~>]/g, '')
+    .replace(/https?:\/\/\S+/gi, 'our website')
+    .replace(/\bERP\b/g, 'E-R-P')
+    .replace(/\b(M-Pesa|MPesa|M-PESA|MPESA)\b/g, 'Em-Pesa')
+    .replace(/\b(eTIMS|ETIMS)\b/g, 'ee-Tims')
+    .replace(/\bKRA\b/g, 'K-R-A')
+    .replace(/\bVisionONE\b/g, 'Vision One')
+    .replace(/\bHR\/Payroll\b/gi, 'H-R and Payroll')
+    .replace(/\bHR\b/g, 'H-R')
+    .replace(/\bSTK Push\b/gi, 'S-T-K Push')
+    .replace(/\bPayBill\b/gi, 'Pay Bill')
+    .replace(/&/g, 'and')
+    .replace(/%/g, 'percent')
+    .replace(/\s+/g, ' ')
     .trim();
 
-  let text = candidate.text || "";
+  let text = candidate.text || '';
 
   if (isEnding) {
-    text =
-      "Thank you for exploring VisionONE Access! Whenever you need complete business visibility across your finance, operations, or payroll, our team is here for you. Have a wonderful day!";
-    voice =
-      "Thank you for speaking with Vision One Access today. Have a wonderful day ahead!";
+    if (shouldCloseWidget) {
+      text = 'Closing VisionONE Access assistant now. Have a wonderful day!';
+      voice = 'Closing Vision One Access assistant now. Have a wonderful day!';
+    } else {
+      text =
+        'Thank you for exploring VisionONE Access! Whenever you need complete business visibility across your finance, operations, or payroll, our team is here for you. Have a wonderful day!';
+      voice =
+        'Thank you for speaking with Vision One Access today. Have a wonderful day ahead!';
+    }
   }
 
   return {
     qaScore: isEnding ? 99 : 98,
     isConversationOver: isEnding,
+    shouldCloseWidget: shouldCloseWidget,
     critiqueSummary: isEnding
-      ? "QA Critic confirmed conversation closure. Applied polite closing farewell with correct phonetic speech."
-      : "QA Critic verified domain accuracy, zero hallucinations, and natural phonetic speech.",
+      ? (shouldCloseWidget
+          ? 'QA Critic confirmed explicit close command. Applied polite goodbye and complete widget closing.'
+          : 'QA Critic confirmed conversation closure. Applied polite closing farewell with correct phonetic speech.')
+      : 'QA Critic verified domain accuracy, zero hallucinations, and natural phonetic speech.',
     improvedText: text,
     improvedVoiceText: voice,
   };
@@ -330,7 +356,7 @@ async function runCriticAgent(
     intent: string;
   }
 ): Promise<CriticEvaluation> {
-  const userWantsEnd = isConversationEndingIntent(userMessage);
+  const { isEnding: userWantsEnd, shouldCloseWidget } = isConversationEndingIntent(userMessage);
 
   const criticPrompt = `Evaluate and refine this candidate AI assistant response for VisionONE Access.
 
@@ -397,16 +423,21 @@ Task:
       parsed.improvedVoiceText &&
       parsed.qaScore !== undefined
     ) {
-      const finalIsOver = Boolean(userWantsEnd || parsed.isConversationOver);
+      const finalIsOver = Boolean(userWantsEnd || (parsed.isConversationOver && userWantsEnd));
       return {
         qaScore: Math.max(92, Math.min(100, Number(parsed.qaScore))),
         isConversationOver: finalIsOver,
+        shouldCloseWidget: shouldCloseWidget,
         critiqueSummary: String(
           parsed.critiqueSummary ||
             "QA Critic verified high domain accuracy and phonetic naturalness."
         ),
-        improvedText: String(parsed.improvedText),
-        improvedVoiceText: String(parsed.improvedVoiceText),
+        improvedText: shouldCloseWidget
+          ? "Closing VisionONE Access assistant now. Have a wonderful day!"
+          : String(parsed.improvedText),
+        improvedVoiceText: shouldCloseWidget
+          ? "Closing Vision One Access assistant now. Have a wonderful day!"
+          : String(parsed.improvedVoiceText),
       };
     }
   } catch (err: any) {
@@ -421,14 +452,21 @@ function generateSmartFallback(message: string, history: Array<any> = []) {
   const query = (message || "").toLowerCase().trim();
   const historyText = (history || []).map((h) => (h.text || "").toLowerCase()).join(" ");
 
-  if (isConversationEndingIntent(message)) {
+  const { isEnding: isFallbackEnding, shouldCloseWidget } = isConversationEndingIntent(message);
+
+  if (isFallbackEnding) {
     return {
-      text: "Thank you for exploring VisionONE Access! Feel free to reach back out whenever you need complete business visibility. Have a wonderful day!",
-      voiceText: "Thank you for speaking with Vision One Access today. Have a wonderful day ahead!",
+      text: shouldCloseWidget
+        ? "Closing VisionONE Access assistant now. Have a wonderful day!"
+        : "Thank you for exploring VisionONE Access! Feel free to reach back out whenever you need complete business visibility. Have a wonderful day!",
+      voiceText: shouldCloseWidget
+        ? "Closing Vision One Access assistant now. Have a wonderful day!"
+        : "Thank you for speaking with Vision One Access today. Have a wonderful day ahead!",
       intent: "conversation_end",
       isConversationOver: true,
+      shouldCloseWidget: shouldCloseWidget,
       qaScore: 99,
-      qaCritique: "QA Critic verified: Gracious closing farewell with correct phonetic speech and conversation completion.",
+      qaCritique: "QA Critic verified: Gracious closing farewell with correct phonetic speech and complete closing intent.",
       suggestedQuestions: ["Start new conversation", "Schedule a demo", "Explore ERP modules"],
       cta: null,
     };
@@ -732,6 +770,7 @@ Respond with a JSON object containing:
           audioUrl: audioUrl || null,
           intent: criticResult.isConversationOver ? "conversation_end" : (parsed.intent || "product_inquiry"),
           isConversationOver: criticResult.isConversationOver,
+          shouldCloseWidget: Boolean(criticResult.shouldCloseWidget),
           qaScore: criticResult.qaScore,
           qaCritique: criticResult.critiqueSummary,
           suggestedQuestions: criticResult.isConversationOver
@@ -798,23 +837,145 @@ app.post("/api/lead", (req, res) => {
   }
 });
 
+// Universal WordPress HFCM & Website Embed Script Loader
+app.get("/embed.js", (req, res) => {
+  res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cache-Control", "public, max-age=300");
+
+  const hostUrl = req.protocol + "://" + req.get("host");
+
+  const embedScript = `(function() {
+  if (window.__VISIONONE_EMBED_INITIALIZED__) return;
+  window.__VISIONONE_EMBED_INITIALIZED__ = true;
+
+  var WIDGET_ORIGIN = "${hostUrl}";
+  var isOpen = false;
+
+  var container = document.createElement("div");
+  container.id = "visionone-ai-container";
+  container.style.position = "fixed";
+  container.style.bottom = "20px";
+  container.style.right = "20px";
+  container.style.width = "270px";
+  container.style.height = "76px";
+  container.style.zIndex = "99999999";
+  container.style.background = "transparent";
+  container.style.border = "none";
+  container.style.margin = "0";
+  container.style.padding = "0";
+  container.style.overflow = "visible";
+  container.style.transition = "width 0.28s cubic-bezier(0.16, 1, 0.3, 1), height 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease";
+  container.style.pointerEvents = "none";
+
+  var iframe = document.createElement("iframe");
+  iframe.id = "visionone-ai-frame";
+  iframe.src = WIDGET_ORIGIN;
+  iframe.title = "VisionONE Voice AI Assistant";
+  iframe.allow = "microphone *; autoplay *; clipboard-write *";
+  iframe.setAttribute("allowtransparency", "true");
+  iframe.style.width = "100%";
+  iframe.style.height = "100%";
+  iframe.style.border = "none";
+  iframe.style.outline = "none";
+  iframe.style.background = "transparent !important";
+  iframe.style.backgroundColor = "transparent !important";
+  iframe.style.colorScheme = "light";
+  iframe.style.overflow = "hidden";
+  iframe.style.pointerEvents = "auto";
+
+  container.appendChild(iframe);
+
+  function mountWidget() {
+    if (!document.body) {
+      setTimeout(mountWidget, 60);
+      return;
+    }
+    document.body.appendChild(container);
+  }
+  mountWidget();
+
+  function adjustWidgetSize(open, completelyClosed) {
+    if (completelyClosed) {
+      container.style.display = "none";
+      return;
+    }
+    container.style.display = "block";
+    var isMobile = window.innerWidth <= 480;
+
+    if (open) {
+      if (isMobile) {
+        container.style.width = "100vw";
+        container.style.height = "100dvh";
+        container.style.bottom = "0px";
+        container.style.right = "0px";
+      } else {
+        container.style.width = "395px";
+        container.style.height = "670px";
+        container.style.bottom = "20px";
+        container.style.right = "20px";
+      }
+    } else {
+      container.style.width = "270px";
+      container.style.height = "76px";
+      container.style.bottom = "20px";
+      container.style.right = "20px";
+    }
+  }
+
+  window.addEventListener("message", function(e) {
+    if (!e.data || typeof e.data !== "object") return;
+    if (e.data.type === "VISIONONE_WIDGET_STATE") {
+      isOpen = Boolean(e.data.isOpen);
+      adjustWidgetSize(isOpen, Boolean(e.data.isClosedCompletely));
+    }
+  });
+
+  window.VisionOneAI = {
+    open: function() {
+      container.style.display = "block";
+      try {
+        iframe.contentWindow && iframe.contentWindow.postMessage({ action: "OPEN_VISIONONE_WIDGET" }, "*");
+      } catch (err) {}
+    },
+    close: function(completely) {
+      try {
+        iframe.contentWindow && iframe.contentWindow.postMessage({ action: completely ? "CLOSE_COMPLETELY" : "CLOSE_VISIONONE_WIDGET" }, "*");
+      } catch (err) {}
+    },
+    toggle: function() {
+      if (isOpen) this.close(false);
+      else this.open();
+    }
+  };
+})();`;
+
+  return res.send(embedScript);
+});
+
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  const isProd = process.env.NODE_ENV === "production";
+  const distPath = path.join(process.cwd(), "dist");
+  const hasDist = fs.existsSync(distPath) && fs.existsSync(path.join(distPath, "index.html"));
+
+  if (isProd && hasDist) {
+    app.use(express.static(distPath));
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api/") || req.path === "/embed.js") {
+        return next();
+      }
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  } else {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`VisionONE Server running on http://0.0.0.0:${PORT}`);
+    console.log(`VisionONE Server listening on port ${PORT} (env: ${process.env.NODE_ENV || 'development'})`);
   });
 }
 

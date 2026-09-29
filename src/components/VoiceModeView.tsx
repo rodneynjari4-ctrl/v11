@@ -63,30 +63,30 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
 
   const getStatusLabel = () => {
     if (isConversationOver) {
-      return 'Conversation finished. You can restart or close the widget below.';
+      return 'Session complete. Tap Start New Conversation to continue.';
     }
     if (isAutoplayBlocked) {
       return 'Browser requires a tap to enable audio & speech';
     }
     if (!hasStarted && voiceState === 'idle') {
-      return 'Assistant is introducing himself...';
+      return 'Tap to begin voice conversation';
     }
     if (isListening) {
       return liveTranscript
-        ? 'Hearing your voice... pause or tap Send'
+        ? 'Hearing your voice... pause when finished'
         : 'Listening hands-free... speak anytime';
     }
     if (isThinking) return 'Evaluating with QA Critic & synthesizing speech...';
-    if (isSpeaking) return 'Speaking neural audio response (tap orb to pause)';
+    if (isSpeaking) return 'Speaking neural audio response';
     return 'Hands-free mode active — speak anytime';
   };
 
   const getStatusBadge = () => {
     if (isConversationOver) {
       return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold shadow-2xs">
-          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-          Conversation Completed
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs">
+          <CheckCircle className="w-3.5 h-3.5 text-slate-500" />
+          Session Finished
         </span>
       );
     }
@@ -249,39 +249,6 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
               )}
             </div>
           )}
-
-          {/* Conversation Completed Action Panel */}
-          {isConversationOver && (
-            <div className="bg-gradient-to-r from-emerald-50/80 to-blue-50/80 border border-emerald-200 rounded-xl p-3 shadow-xs space-y-2 animate-in fade-in duration-300">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 font-['Sora']">
-                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Conversation Concluded</span>
-              </div>
-              <p className="text-[11px] text-slate-700 font-['Inter'] leading-relaxed">
-                Thank you for speaking with VisionONE Access AI. Would you like to start a fresh conversation or close the widget?
-              </p>
-              <div className="flex items-center gap-2 pt-1">
-                {onRestartConversation && (
-                  <button
-                    onClick={onRestartConversation}
-                    className="flex-1 py-1.5 px-3 rounded-lg bg-[#1D8DE6] hover:bg-[#111A3A] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer font-['Sora']"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>New Chat</span>
-                  </button>
-                )}
-                {onClose && (
-                  <button
-                    onClick={onClose}
-                    className="flex-1 py-1.5 px-3 rounded-lg bg-slate-200 hover:bg-red-500 hover:text-white text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer font-['Sora']"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>Close Widget</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -337,24 +304,15 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
             </span>
           </div>
         ) : (
-          /* When conversation is over, provide explicit close or restart action */
-          <div className="flex items-center gap-3">
+          /* When conversation is over, provide explicit restart action */
+          <div className="flex items-center justify-center">
             {onRestartConversation && (
               <button
                 onClick={onRestartConversation}
-                className="px-4 py-2 rounded-full bg-[#1D8DE6] hover:bg-[#111A3A] text-white text-xs font-semibold font-['Sora'] shadow-md flex items-center gap-1.5 transition cursor-pointer active:scale-95"
+                className="px-5 py-2.5 rounded-full bg-[#1D8DE6] hover:bg-[#111A3A] text-white text-xs font-semibold font-['Sora'] shadow-md flex items-center gap-2 transition cursor-pointer active:scale-95"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Start New Conversation</span>
-              </button>
-            )}
-            {onClose && (
-              <button
-                onClick={onClose}
-                className="px-4 py-2 rounded-full bg-slate-200 hover:bg-red-500 hover:text-white text-slate-800 text-xs font-semibold font-['Sora'] shadow-sm flex items-center gap-1.5 transition cursor-pointer active:scale-95"
-              >
-                <X className="w-3.5 h-3.5" />
-                <span>Close Widget</span>
               </button>
             )}
           </div>

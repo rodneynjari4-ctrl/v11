@@ -1,12 +1,14 @@
 import React from 'react';
-import { Volume2, VolumeX, RotateCcw, ShieldCheck, X } from 'lucide-react';
+import { Volume2, VolumeX, RotateCcw, ShieldCheck, Minus, Code2 } from 'lucide-react';
 import { VoiceSettings } from '../types';
 
 interface AssistantHeaderProps {
   onReset: () => void;
   voiceSettings: VoiceSettings;
   onToggleMute: () => void;
+  onMinimize?: () => void;
   onClose?: () => void;
+  onOpenEmbedGuide?: () => void;
   qaScore?: number;
 }
 
@@ -14,7 +16,8 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
   onReset,
   voiceSettings,
   onToggleMute,
-  onClose,
+  onMinimize,
+  onOpenEmbedGuide,
   qaScore = 98,
 }) => {
   return (
@@ -63,6 +66,17 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
 
       {/* Action Controls */}
       <div className="flex items-center gap-1 text-white/80">
+        {onOpenEmbedGuide && (
+          <button
+            onClick={onOpenEmbedGuide}
+            className="p-1.5 rounded-md hover:text-white hover:bg-white/10 transition-colors cursor-pointer text-[#35A6F7]"
+            title="WordPress HFCM Embed Code & Settings"
+            aria-label="WordPress HFCM Embed Code"
+          >
+            <Code2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         <button
           onClick={onToggleMute}
           className="p-1.5 rounded-md hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
@@ -81,15 +95,14 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
 
-        {onClose && (
+        {onMinimize && (
           <button
-            onClick={onClose}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/15 hover:bg-red-500/80 text-white transition-all cursor-pointer text-[11px] font-semibold font-['Sora'] border border-white/20 shadow-xs ml-1 hover:border-red-400"
-            title="Close Assistant Entirely"
-            aria-label="Close Assistant Entirely"
+            onClick={onMinimize}
+            className="p-1.5 rounded-md hover:text-white hover:bg-white/10 transition-colors cursor-pointer ml-0.5"
+            title="Minimize to floating button"
+            aria-label="Minimize to floating button"
           >
-            <span>Close</span>
-            <X className="w-3.5 h-3.5" />
+            <Minus className="w-3.5 h-3.5" />
           </button>
         )}
       </div>
