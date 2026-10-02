@@ -39,16 +39,16 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
 
       ctx.clearRect(0, 0, width, height);
 
-      // Base radius scaled down for compact embed
-      const baseRadius = 40;
-      const ampBoost = state === 'speaking' || state === 'listening' ? (amplitude || 0.4) * 16 : 4;
+      // Base radius scaled down for compact embed on mobile
+      const baseRadius = 30;
+      const ampBoost = state === 'speaking' || state === 'listening' ? (amplitude || 0.4) * 12 : 3;
 
       // Draw subtle radiating waves
       if (state === 'listening' || state === 'speaking' || state === 'thinking') {
         const ringCount = 2;
         for (let i = ringCount; i >= 1; i--) {
           const ringProgress = (phase * 0.8 + i * 0.45) % 1;
-          const currentRadius = baseRadius + ringProgress * 24 + (amplitude * 12);
+          const currentRadius = baseRadius + ringProgress * 18 + (amplitude * 10);
           const alpha = (1 - ringProgress) * (state === 'listening' ? 0.35 : 0.22);
 
           ctx.beginPath();
@@ -197,13 +197,13 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
         {/* Dynamic HTML5 Canvas rendering interactive waveforms */}
         <canvas
           ref={canvasRef}
-          width={130}
-          height={130}
+          width={106}
+          height={106}
           className="relative z-10 drop-shadow-md transition-transform duration-300"
         />
 
         {/* Inner Specular Highlight Lens */}
-        <div className="absolute inset-6 rounded-full bg-gradient-to-b from-white/35 via-transparent to-transparent pointer-events-none z-20" />
+        <div className="absolute inset-5 rounded-full bg-gradient-to-b from-white/35 via-transparent to-transparent pointer-events-none z-20" />
 
         {/* Center state icon if error */}
         {state === 'error' && (

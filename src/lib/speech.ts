@@ -36,13 +36,18 @@ const FEMALE_VOICE_PATTERNS = [
   'zoe', 'zuzana', 'lucy', 'sonia', 'natasha', 'katja', 'evelyn', 'dora', 'chiara'
 ];
 
+// Robotic synth voice identifiers to heavily penalize
+const ROBOTIC_VOICE_PATTERNS = [
+  'espeak', 'kal', 'synth', 'robot', 'bad', 'whisper', 'croak', 'desktop'
+];
+
 // Preferred warm, natural male browser voices
 const WARM_MALE_VOICE_PRIORITY = [
-  'microsoft guy online (natural)',
   'microsoft christopher online (natural)',
+  'microsoft guy online (natural)',
   'microsoft ryan online (natural)',
-  'microsoft andrew online (natural)',
   'microsoft brian online (natural)',
+  'microsoft andrew online (natural)',
   'daniel (enhanced)',
   'oliver (enhanced)',
   'evan (enhanced)',
@@ -50,8 +55,7 @@ const WARM_MALE_VOICE_PRIORITY = [
   'google uk english male',
   'daniel',
   'alex',
-  'microsoft david',
-  'fred'
+  'microsoft david'
 ];
 
 /**
@@ -90,11 +94,17 @@ export function normalizeTextForNaturalSpeech(rawText: string): string {
   text = text.replace(/\bETIMS\b/g, 'ee-Tims');
   text = text.replace(/\bKRA\b/g, 'K-R-A');
   text = text.replace(/\bVisionONE\b/g, 'Vision One');
+  text = text.replace(/\bVisionOne\b/g, 'Vision One');
+  text = text.replace(/\bAI\b/g, 'A-I');
   text = text.replace(/\bPayBill\b/g, 'Pay Bill');
   text = text.replace(/\bSTK Push\b/g, 'S-T-K Push');
+  text = text.replace(/\bSTK\b/g, 'S-T-K');
   text = text.replace(/\bVAT\b/g, 'V-A-T');
   text = text.replace(/\bP&L\b/g, 'P and L');
   text = text.replace(/\bAPI\b/g, 'A-P-I');
+  text = text.replace(/\betc\./gi, 'and so on');
+  text = text.replace(/\be\.g\./gi, 'for example');
+  text = text.replace(/\bi\.e\./gi, 'that is');
 
   return text.replace(/\s+/g, ' ').trim();
 }
@@ -453,9 +463,23 @@ export class SpeechSynthesisManager {
   private warmMaleVoice: SpeechSynthesisVoice | null = null;
   private watchdogTimer: ReturnType<typeof setTimeout> | null = null;
   private voiceMode: 'neural' | 'browser' = 'neural';
+  private preloadedWelcomeAudio: HTMLAudioElement | null = null;
 
   constructor() {
     this.initBrowserVoices();
+    this.initPreloadedAudio();
+  }
+
+  private initPreloadedAudio() {
+    if (typeof window !== 'undefined') {
+      try {
+        const audio = new Audio('/audio/welcome.wav');
+        audio.preload = 'auto';
+        this.preloadedWelcomeAudio = audio;
+      } catch (err) {
+        console.warn('Could not pre-instantiate welcome audio:', err);
+      }
+    }
   }
 
   private initBrowserVoices() {
@@ -487,32 +511,40 @@ export class SpeechSynthesisManager {
       const lowerName = voice.name.toLowerCase();
       let score = 0;
 
+      // Strictly penalize female voices for this persona
       if (FEMALE_VOICE_PATTERNS.some((fem) => lowerName.includes(fem))) {
         score -= 10000;
       }
 
+      // Penalize robotic synth voices
+      if (ROBOTIC_VOICE_PATTERNS.some((rob) => lowerName.includes(rob))) {
+        score -= 5000;
+      }
+
+      // Heavily prioritize natural neural online voices
       if (
         lowerName.includes('online (natural)') ||
         lowerName.includes('natural') ||
         lowerName.includes('neural') ||
         lowerName.includes('enhanced')
       ) {
-        score += 3500;
+        score += 4500;
       }
 
+      // Match against prioritized natural male list
       for (let i = 0; i < WARM_MALE_VOICE_PRIORITY.length; i++) {
         if (lowerName.includes(WARM_MALE_VOICE_PRIORITY[i])) {
-          score += 2500 - i * 40;
+          score += 3000 - i * 50;
           break;
         }
       }
 
       if (lowerName.includes('male') && !lowerName.includes('female')) {
-        score += 400;
+        score += 500;
       }
 
       if (voice.lang === 'en-US' || voice.lang === 'en-GB') {
-        score += 100;
+        score += 150;
       }
 
       if (score > bestScore) {
@@ -552,7 +584,6 @@ export class SpeechSynthesisManager {
       try {
         this.currentAudio.pause();
         this.currentAudio.currentTime = 0;
-        this.currentAudio.src = '';
       } catch {}
       this.currentAudio = null;
     }
@@ -565,8 +596,80 @@ export class SpeechSynthesisManager {
   }
 
   /**
+   * Plays the intro welcome greeting with zero-latency audio or browser fallback.
+   */
+  public playWelcomeImmediately(options: {
+    onStart?: () => void;
+    onEnd?: () => void;
+    onError?: (err: any) => void;
+    onAutoplayBlocked?: () => void;
+  } = {}): void {
+    this.stop();
+    this.voiceMode = 'neural';
+    this.isSpeakingState = true;
+
+    const welcomeText = "Hello! I am your Vision One AI assistant. How can I help you today with your ERP, finance, payroll, or business operations?";
+    const audio = new Audio('/audio/welcome.wav');
+    this.currentAudio = audio;
+    audio.currentTime = 0;
+    audio.volume = 1.0;
+
+    let isFinished = false;
+    const cleanup = () => {
+      if (isFinished) return;
+      isFinished = true;
+      this.isSpeakingState = false;
+      if (this.watchdogTimer) {
+        clearTimeout(this.watchdogTimer);
+        this.watchdogTimer = null;
+      }
+      if (this.currentAudio === audio) {
+        this.currentAudio = null;
+      }
+    };
+
+    audio.onplay = () => {
+      options.onStart?.();
+      this.watchdogTimer = setTimeout(() => {
+        if (!isFinished) {
+          cleanup();
+          options.onEnd?.();
+        }
+      }, 14000);
+    };
+
+    audio.onended = () => {
+      cleanup();
+      options.onEnd?.();
+    };
+
+    audio.onerror = () => {
+      if (isFinished) return;
+      cleanup();
+      this.playBrowserSpeech(welcomeText, options);
+    };
+
+    try {
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          if (isFinished) return;
+          console.warn('Welcome audio instant play notice:', err);
+          cleanup();
+          this.playBrowserSpeech(welcomeText, options);
+        });
+      }
+    } catch (err) {
+      if (!isFinished) {
+        cleanup();
+        this.playBrowserSpeech(welcomeText, options);
+      }
+    }
+  }
+
+  /**
    * Speaks text using ultra-realistic Gemini Neural Audio if available,
-   * with automatic fallback to browser speech synthesis.
+   * with automatic fallback to high-quality browser speech synthesis.
    */
   public async speakText(
     text: string,
@@ -598,23 +701,7 @@ export class SpeechSynthesisManager {
       }
     }
 
-    // 2. Fetch neural audio on demand if not provided
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: spokenText, voice: 'Charon' }),
-      });
-      const data = await res.json();
-      if (data.audioUrl) {
-        await this.playNeuralAudio(data.audioUrl, spokenText, options);
-        return;
-      }
-    } catch (ttsErr) {
-      console.warn('On-demand TTS fetch notice:', ttsErr);
-    }
-
-    // 3. Fallback to enhanced browser SpeechSynthesis
+    // 2. Fallback to enhanced natural browser SpeechSynthesis directly (zero lag)
     this.playBrowserSpeech(spokenText, options);
   }
 
@@ -653,7 +740,6 @@ export class SpeechSynthesisManager {
       audio.onplay = () => {
         options.onStart?.();
 
-        // Safety watchdog: ensure state advances even if audio events miss
         const durationSec = audio.duration && !isNaN(audio.duration) ? audio.duration : Math.max(3, spokenText.split(' ').length * 0.45);
         this.watchdogTimer = setTimeout(() => {
           if (!isFinished) {
@@ -670,19 +756,16 @@ export class SpeechSynthesisManager {
         resolve();
       };
 
-      audio.onerror = (e) => {
+      audio.onerror = () => {
+        if (isFinished) return;
         cleanup();
-        options.onError?.(e);
-        // Fall back to browser speech if audio element fails
         this.playBrowserSpeech(spokenText, options);
         resolve();
       };
 
       audio.play().catch((playErr: any) => {
-        console.warn('Audio play autoplay policy notice:', playErr);
-        if (playErr?.name === 'NotAllowedError') {
-          options.onAutoplayBlocked?.();
-        }
+        if (isFinished) return;
+        console.warn('Audio play notice, switching to browser speech:', playErr?.message);
         cleanup();
         this.playBrowserSpeech(spokenText, options);
         resolve();
@@ -708,9 +791,17 @@ export class SpeechSynthesisManager {
     this.voiceMode = 'browser';
     this.isSpeakingState = true;
 
+    // Refresh voices if not found initially
+    if (!this.warmMaleVoice) {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices && voices.length > 0) {
+        this.warmMaleVoice = this.selectWarmMaleVoice(voices);
+      }
+    }
+
     const utterance = new SpeechSynthesisUtterance(spokenText);
-    utterance.pitch = options.pitch !== undefined ? Math.min(1.05, Math.max(0.96, options.pitch)) : 1.0;
-    utterance.rate = options.rate !== undefined ? Math.min(1.05, Math.max(0.92, options.rate)) : 0.98;
+    utterance.pitch = options.pitch !== undefined ? Math.min(1.04, Math.max(0.96, options.pitch)) : 1.0;
+    utterance.rate = options.rate !== undefined ? Math.min(1.06, Math.max(0.98, options.rate)) : 1.02;
     utterance.volume = 1.0;
     utterance.lang = 'en-US';
 
@@ -719,6 +810,7 @@ export class SpeechSynthesisManager {
     }
 
     let isFinished = false;
+    let hasStarted = false;
     const cleanup = () => {
       if (isFinished) return;
       isFinished = true;
@@ -730,10 +822,10 @@ export class SpeechSynthesisManager {
     };
 
     utterance.onstart = () => {
+      hasStarted = true;
       options.onStart?.();
 
-      // Browser TTS watchdog: guarantee completion within 12 seconds max
-      const estimatedSec = Math.max(2.5, spokenText.split(' ').length * 0.45);
+      const estimatedSec = Math.max(2.5, spokenText.split(' ').length * 0.42);
       this.watchdogTimer = setTimeout(() => {
         if (!isFinished) {
           cleanup();
@@ -758,11 +850,30 @@ export class SpeechSynthesisManager {
       options.onEnd?.();
     };
 
-    try {
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      cleanup();
-      options.onEnd?.();
+    const doSpeak = () => {
+      try {
+        window.speechSynthesis.speak(utterance);
+        window.speechSynthesis.resume();
+
+        setTimeout(() => {
+          if (!isFinished && !hasStarted && this.isSpeakingState) {
+            options.onStart?.();
+          }
+        }, 250);
+      } catch {
+        cleanup();
+        options.onEnd?.();
+      }
+    };
+
+    // If already speaking, cancel with a tiny 30ms breather so Chromium does not cancel the new speak
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+      setTimeout(doSpeak, 30);
+    } else {
+      doSpeak();
     }
   }
 }

@@ -32,6 +32,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// Statically serve pre-rendered high-definition neural audio assets immediately with zero latency
+app.use("/audio", express.static(path.join(process.cwd(), "public", "audio"), {
+  setHeaders: (res, filePath) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    if (filePath.endsWith(".wav")) {
+      res.setHeader("Content-Type", "audio/wav");
+    }
+    res.setHeader("Cache-Control", "public, max-age=86400");
+  }
+}));
+
 let geminiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
   if (!geminiClient) {
@@ -57,30 +68,31 @@ const leadsStore: Array<any> = [];
 // High-definition Neural TTS Audio Cache & PCM to WAV converter
 const ttsCache = new Map<string, string>();
 
-function pcmToWavBase64(pcmBase64: string, sampleRate = 24000, numChannels = 1): string {
-  const pcmBuffer = Buffer.from(pcmBase64, "base64");
-  const byteRate = sampleRate * numChannels * 2;
-  const blockAlign = numChannels * 2;
-  const dataLength = pcmBuffer.length;
-  const buffer = Buffer.alloc(44 + dataLength);
+// Pre-load welcome audio file into in-memory base64 cache on startup for instantaneous response
+try {
+  const welcomeAudioPath = path.join(process.cwd(), "public", "audio", "welcome.wav");
+  if (fs.existsSync(welcomeAudioPath)) {
+    const wavBuffer = fs.readFileSync(welcomeAudioPath);
+    const dataUri = `data:audio/wav;base64,${wavBuffer.toString("base64")}`;
+    const keys = [
+      "Charon:Hello! I am your Vision One AI assistant. How can I help you today with your ERP, finance, payroll, or business operations?",
+      "Charon:Hello! I am your Vision One A-I assistant. How can I help you today with your E-R-P, finance, payroll, or business operations?",
+      "Puck:Hello! I am your Vision One AI assistant. How can I help you today with your ERP, finance, payroll, or business operations?",
+      "Puck:Hello! I am your Vision One A-I assistant. How can I help you today with your E-R-P, finance, payroll, or business operations?",
+    ];
+    for (const k of keys) {
+      ttsCache.set(k, dataUri);
+    }
+    console.log("Pre-cached welcome.wav into in-memory TTS cache.");
+  }
+} catch (preErr: any) {
+  console.warn("Notice: welcome.wav pre-cache skipped:", preErr?.message);
+}
 
-  // RIFF container header
-  buffer.write("RIFF", 0);
-  buffer.writeUInt32LE(36 + dataLength, 4);
-  buffer.write("WAVE", 8);
-  buffer.write("fmt ", 12);
-  buffer.writeUInt32LE(16, 16);
-  buffer.writeUInt16LE(1, 20); // Linear PCM
-  buffer.writeUInt16LE(numChannels, 22);
-  buffer.writeUInt32LE(sampleRate, 24);
-  buffer.writeUInt32LE(byteRate, 28);
-  buffer.writeUInt16LE(blockAlign, 32);
-  buffer.writeUInt16LE(16, 34); // 16-bit
-  buffer.write("data", 36);
-  buffer.writeUInt32LE(dataLength, 40);
-  pcmBuffer.copy(buffer, 44);
-
-  return buffer.toString("base64");
+// Helper to format clean audio data URI directly from Gemini TTS output
+function formatAudioDataUrl(base64Data: string, mimeType = "audio/wav"): string {
+  const cleanMime = mimeType || "audio/wav";
+  return `data:${cleanMime};base64,${base64Data}`;
 }
 
 async function generateSpeechAudio(text: string, voiceName = "Charon"): Promise<string | null> {
@@ -94,30 +106,42 @@ async function generateSpeechAudio(text: string, voiceName = "Charon"): Promise<
 
   if (!process.env.GEMINI_API_KEY) return null;
 
-  try {
-    const ai = getGeminiClient();
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-tts-preview",
-      contents: [{ parts: [{ text: trimmed }] }],
-      config: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName }
+  const ai = getGeminiClient();
+  // gemini-3.8-flash-tts is the primary high-fidelity voice model with reliable quota
+  const modelsToTry = [
+    "gemini-3.8-flash-tts",
+    "gemini-3.8-flash-lite-tts",
+    "gemini-3.1-flash-tts-preview"
+  ];
+
+  for (const model of modelsToTry) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ parts: [{ text: trimmed }] }],
+        config: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName }
+            }
           }
         }
-      }
-    });
+      });
 
-    const part = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-    if (part?.data) {
-      const wavBase64 = pcmToWavBase64(part.data, 24000, 1);
-      const dataUrl = `data:audio/wav;base64,${wavBase64}`;
-      ttsCache.set(cacheKey, dataUrl);
-      return dataUrl;
+      const part = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+      if (part?.data) {
+        const dataUrl = formatAudioDataUrl(part.data, part.mimeType);
+        ttsCache.set(cacheKey, dataUrl);
+        return dataUrl;
+      }
+    } catch (err: any) {
+      const errMsg = err?.message || "";
+      if (errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED")) {
+        console.warn(`[TTS Quota Notice] Model ${model} quota reached, checking fallback.`);
+      }
+      // Continue to next model if available
     }
-  } catch (err: any) {
-    console.warn("Neural TTS generation notice (using fallback):", err?.message);
   }
   return null;
 }
@@ -811,6 +835,17 @@ app.post("/api/tts", async (req, res) => {
   return res.json({ audioUrl: audioUrl || null });
 });
 
+// Dedicated Welcome Audio Endpoint with instantaneous zero-latency streaming
+app.get("/api/welcome-audio", (req, res) => {
+  const audioPath = path.join(process.cwd(), "public", "audio", "welcome.wav");
+  if (fs.existsSync(audioPath)) {
+    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    return res.sendFile(audioPath);
+  }
+  return res.status(404).send("Welcome audio not found");
+});
+
 // 3. Lead capture endpoint
 app.post("/api/lead", (req, res) => {
   try {
@@ -913,21 +948,24 @@ app.get("/embed.js", (req, res) => {
 
     if (open) {
       if (isMobile) {
-        container.style.width = "100vw";
-        container.style.height = "100dvh";
-        container.style.bottom = "0px";
-        container.style.right = "0px";
+        container.style.width = "calc(100vw - 16px)";
+        container.style.height = "min(580px, calc(100dvh - 16px))";
+        container.style.bottom = "8px";
+        container.style.right = "8px";
+        container.style.left = "8px";
       } else {
-        container.style.width = "395px";
-        container.style.height = "670px";
+        container.style.width = "360px";
+        container.style.height = "580px";
         container.style.bottom = "20px";
         container.style.right = "20px";
+        container.style.left = "auto";
       }
     } else {
-      container.style.width = "270px";
-      container.style.height = "76px";
+      container.style.width = "250px";
+      container.style.height = "64px";
       container.style.bottom = "20px";
       container.style.right = "20px";
+      container.style.left = "auto";
     }
   }
 

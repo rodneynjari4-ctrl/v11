@@ -62,7 +62,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   return (
     <div
       id="visionone-assistant-panel"
-      className="relative flex flex-col w-full h-full bg-white rounded-none sm:rounded-2xl shadow-xl border-0 sm:border sm:border-slate-200/90 overflow-hidden transition-all duration-300 select-none text-[#111A3A]"
+      className="glass-panel relative flex flex-col w-full h-full rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 select-none text-[#111A3A]"
     >
       {/* Universal Header with Close Button and Critic QA Score */}
       <AssistantHeader
@@ -76,18 +76,18 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
       />
 
       {/* Sub-header status bar - Dedicated to Voice AI */}
-      <div className="px-3.5 py-1.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between shrink-0">
+      <div className="px-3.5 py-1.5 bg-white/40 backdrop-blur-md border-b border-white/20 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-1.5">
           <Mic className="w-3.5 h-3.5 text-[#1D8DE6]" />
           <span className="text-[11px] font-semibold text-[#111A3A] font-['Sora']">
             Hands-Free Voice AI
           </span>
-          <span className={`text-[9px] font-medium px-1.5 py-0.2 rounded-sm ${
+          <span className={`text-[8px] font-semibold px-1.5 py-0.2 rounded-full ${
             isConversationOver
-              ? 'bg-blue-100 text-blue-800'
+              ? 'bg-blue-100/80 text-blue-800'
               : !hasStarted
-              ? 'bg-amber-100 text-amber-800'
-              : 'bg-emerald-100 text-emerald-800'
+              ? 'bg-amber-100/80 text-amber-800'
+              : 'bg-emerald-100/80 text-emerald-800'
           }`}>
             {isConversationOver ? 'Concluded' : !hasStarted ? 'Intro' : 'Active'}
           </span>
@@ -128,13 +128,13 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
       </div>
 
       {/* Responsive Clean Footer */}
-      <footer className="px-3.5 py-1.5 sm:py-2 bg-slate-50 border-t border-slate-200/80 flex items-center justify-between text-[10px] text-[#111A3A]/60 font-['Inter'] shrink-0 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
+      <footer className="px-3 py-1.5 bg-white/30 backdrop-blur-md border-t border-white/20 flex items-center justify-between text-[9px] text-[#111A3A]/60 font-['Inter'] shrink-0 pb-[max(env(safe-area-inset-bottom),0.35rem)]">
         <span className="flex items-center gap-1">
           <Sparkles className="w-3 h-3 text-[#1D8DE6]" />
-          <span className="font-medium">VisionONE Voice Access</span>
+          <span className="font-semibold text-[#111A3A]/80">VisionONE Voice</span>
         </span>
         <span className="text-[9px] text-[#111A3A]/50">
-          Continuous Automatic Turn-Taking
+          Continuous Hands-Free Turn-Taking
         </span>
       </footer>
     </div>

@@ -23,12 +23,12 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
   return (
     <header
       id="visionone-assistant-header"
-      className="px-3.5 py-2.5 bg-[#111A3A] text-white flex items-center justify-between border-b border-white/10 select-none shadow-xs shrink-0"
+      className="px-3.5 py-2 bg-[#111A3A]/92 backdrop-blur-xl text-white flex items-center justify-between border-b border-white/15 select-none shadow-xs shrink-0"
     >
       {/* Brand & Identity */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2">
         {/* VisionONE Access Emblem */}
-        <div className="relative w-7 h-7 rounded-lg bg-white/10 backdrop-blur-md flex items-center justify-center p-1 border border-white/15 shadow-inner shrink-0">
+        <div className="relative w-6 h-6 rounded-lg bg-white/15 backdrop-blur-md flex items-center justify-center p-1 border border-white/20 shadow-inner shrink-0">
           <svg viewBox="0 0 40 40" fill="none" className="w-full h-full">
             <path
               d="M8 20C8 13.3726 13.3726 8 20 8C26.6274 8 32 13.3726 32 20C32 26.6274 26.6274 32 20 32"
@@ -44,19 +44,19 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
               strokeLinecap="round"
             />
           </svg>
-          <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border-2 border-[#111A3A]" />
+          <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 border border-[#111A3A]" />
         </div>
 
         <div>
-          <h1 className="text-xs sm:text-sm font-bold tracking-tight text-white font-['Sora'] leading-none">
+          <h1 className="text-xs font-bold tracking-tight text-white font-['Sora'] leading-tight">
             VisionONE Access AI
           </h1>
-          <div className="flex items-center gap-1.5 mt-0.5">
+          <div className="flex items-center gap-1.5">
             <span className="inline-flex items-center gap-1 text-[9px] font-medium text-[#E5F0FE]/90 font-['Inter']">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              AI Assistant
+              Voice AI
             </span>
-            <span className="text-[9px] text-white/40">•</span>
+            <span className="text-[9px] text-white/30">•</span>
             <span className="text-[9px] text-[#35A6F7] font-['IBM_Plex_Mono'] flex items-center gap-0.5" title="Critic Agent QA Verified">
               <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" /> QA {qaScore}%
             </span>
@@ -65,11 +65,11 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
       </div>
 
       {/* Action Controls */}
-      <div className="flex items-center gap-1 text-white/80">
+      <div className="flex items-center gap-0.5 text-white/85">
         {onOpenEmbedGuide && (
           <button
             onClick={onOpenEmbedGuide}
-            className="p-1.5 rounded-md hover:text-white hover:bg-white/10 transition-colors cursor-pointer text-[#35A6F7]"
+            className="p-1 rounded-md hover:text-white hover:bg-white/15 transition-colors cursor-pointer text-[#35A6F7]"
             title="WordPress HFCM Embed Code & Settings"
             aria-label="WordPress HFCM Embed Code"
           >
@@ -79,7 +79,7 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
 
         <button
           onClick={onToggleMute}
-          className="p-1.5 rounded-md hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          className="p-1 rounded-md hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
           title={voiceSettings.isMuted ? 'Unmute voice responses' : 'Mute voice responses'}
           aria-label={voiceSettings.isMuted ? 'Unmute voice' : 'Mute voice'}
         >
@@ -88,7 +88,7 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
 
         <button
           onClick={onReset}
-          className="p-1.5 rounded-md hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          className="p-1 rounded-md hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
           title="Restart conversation"
           aria-label="Restart conversation"
         >
@@ -98,7 +98,7 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
         {onMinimize && (
           <button
             onClick={onMinimize}
-            className="p-1.5 rounded-md hover:text-white hover:bg-white/10 transition-colors cursor-pointer ml-0.5"
+            className="p-1 rounded-md hover:text-white hover:bg-white/15 transition-colors cursor-pointer ml-0.5"
             title="Minimize to floating button"
             aria-label="Minimize to floating button"
           >

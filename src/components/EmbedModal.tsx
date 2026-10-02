@@ -31,16 +31,18 @@ export const EmbedModal: React.FC<EmbedModalProps> = ({ isOpen, onClose }) => {
     if (e.data.isOpen) {
       var isMobile = window.innerWidth <= 480;
       el.style.display = 'block';
-      el.style.width = isMobile ? '100vw' : '395px';
-      el.style.height = isMobile ? '100dvh' : '670px';
-      el.style.bottom = isMobile ? '0' : '20px';
-      el.style.right = isMobile ? '0' : '20px';
+      el.style.width = isMobile ? 'calc(100vw - 16px)' : '360px';
+      el.style.height = isMobile ? 'min(580px, calc(100dvh - 16px))' : '580px';
+      el.style.bottom = isMobile ? '8px' : '20px';
+      el.style.right = isMobile ? '8px' : '20px';
+      el.style.left = isMobile ? '8px' : 'auto';
     } else {
       el.style.display = 'block';
-      el.style.width = '270px';
-      el.style.height = '76px';
+      el.style.width = '250px';
+      el.style.height = '64px';
       el.style.bottom = '20px';
       el.style.right = '20px';
+      el.style.left = 'auto';
     }
   });
 })();

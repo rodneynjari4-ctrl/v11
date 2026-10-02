@@ -31,8 +31,8 @@
 
 /* Custom scrollbar for transcript */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -40,12 +40,46 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(29, 141, 230, 0.18);
+  background: rgba(29, 141, 230, 0.2);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(29, 141, 230, 0.35);
+  background: rgba(29, 141, 230, 0.4);
+}
+
+/* Glassmorphic design system */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 20px 50px -10px rgba(17, 26, 58, 0.22),
+              0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 4px 20px 0 rgba(17, 26, 58, 0.06);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 8px 0 rgba(17, 26, 58, 0.04);
+}
+
+.glass-dark-capsule {
+  background: rgba(17, 26, 58, 0.85);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 16px 36px -6px rgba(17, 26, 58, 0.35);
 }
 
 /* Respect reduced motion */

@@ -11,6 +11,7 @@ const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   role: 'assistant',
   text: "Hello! I am your Vision One AI assistant. How can I help you today with your ERP, finance, payroll, or business operations?",
   voiceText: "Hello! I am your Vision One A-I assistant. How can I help you today with your E-R-P, finance, payroll, or business operations?",
+  audioUrl: "/audio/welcome.wav",
   timestamp: Date.now(),
   qaScore: 99,
   qaCritique: "QA Critic verified: Proper self-introduction and domain framing.",
@@ -487,23 +488,46 @@ export default function App() {
     );
   };
 
-  // Triggered when user CLICKS the widget button: Opens widget and starts the voice!
+  // Triggered when user CLICKS the widget button: Opens widget and introduces himself IMMEDIATELY!
   const handleOpenAssistant = () => {
     setIsDismissed(false);
     setIsOpen(true);
     setIsAutoListening(true);
     setIsConversationOver(false);
+    setHasStarted(true);
 
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.resume();
     }
 
-    setHasStarted(true);
-    speakVoice(
-      INITIAL_WELCOME_MESSAGE.voiceText || INITIAL_WELCOME_MESSAGE.text,
-      true,
-      cachedWelcomeAudioUrlRef.current || INITIAL_WELCOME_MESSAGE.audioUrl
-    );
+    // Synchronous execution within the user's click handler guarantees zero-latency instant speech
+    speechSynthesisRef.current?.playWelcomeImmediately({
+      onStart: () => {
+        setVoiceState('speaking');
+        setActivePlayingText(INITIAL_WELCOME_MESSAGE.voiceText || INITIAL_WELCOME_MESSAGE.text);
+        setIsAutoplayBlocked(false);
+      },
+      onEnd: () => {
+        setActivePlayingText(null);
+        if (isAutoListeningRef.current && !isConversationOverRef.current) {
+          startListening();
+        } else {
+          setVoiceState('idle');
+        }
+      },
+      onError: () => {
+        setActivePlayingText(null);
+        if (isAutoListeningRef.current && !isConversationOverRef.current) {
+          startListening();
+        } else {
+          setVoiceState('idle');
+        }
+      },
+      onAutoplayBlocked: () => {
+        setIsAutoplayBlocked(true);
+        setVoiceState('idle');
+      },
+    });
   };
 
   const handleLeadSubmit = async (leadData: LeadFormData): Promise<boolean> => {
@@ -541,10 +565,10 @@ export default function App() {
             isOpen,
             isClosedCompletely: isDismissed,
             dimensions: isOpen
-              ? { width: 395, height: 670 }
+              ? { width: 360, height: 580 }
               : isDismissed
               ? { width: 0, height: 0 }
-              : { width: 270, height: 76 },
+              : { width: 250, height: 64 },
           },
           '*'
         );
@@ -572,7 +596,7 @@ export default function App() {
 
   return (
     <div
-      className={`fixed inset-0 flex flex-col justify-end items-end p-2 sm:p-3 select-none overflow-hidden font-['Inter'] transition-colors duration-200 ${
+      className={`fixed inset-0 flex flex-col justify-end items-end p-2 select-none overflow-hidden font-['Inter'] transition-colors duration-200 ${
         isOpen ? 'pointer-events-auto' : 'pointer-events-none'
       }`}
       style={{ background: 'transparent' }}
@@ -582,17 +606,17 @@ export default function App() {
         <div className="pointer-events-auto flex items-end justify-end animate-in fade-in zoom-in-95 duration-200">
           <button
             onClick={handleOpenAssistant}
-            className="group flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#111A3A] via-[#1D8DE6] to-[#35A6F7] text-white shadow-2xl hover:shadow-cyan-500/40 hover:scale-105 active:scale-95 transition-all cursor-pointer border border-white/20"
+            className="group flex items-center gap-2 px-3.5 py-2 rounded-full glass-dark-capsule text-white shadow-xl hover:shadow-[#1D8DE6]/35 hover:scale-102 active:scale-98 transition-all cursor-pointer border border-white/25"
             aria-label="Open VisionONE Voice Assistant"
           >
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors shrink-0">
-              <Mic className="w-4 h-4 text-white animate-pulse" />
+            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#1D8DE6] to-[#35A6F7] flex items-center justify-center shrink-0 shadow-xs">
+              <Mic className="w-3.5 h-3.5 text-white animate-pulse" />
             </div>
             <div className="text-left pr-1">
-              <span className="block text-xs font-bold font-['Sora'] leading-tight whitespace-nowrap">
+              <span className="block text-xs font-bold font-['Sora'] leading-tight whitespace-nowrap text-white">
                 VisionONE Voice AI
               </span>
-              <span className="block text-[10px] text-[#E5F0FE] font-['Inter'] whitespace-nowrap">
+              <span className="block text-[9px] text-[#E5F0FE]/85 font-['Inter'] whitespace-nowrap">
                 Click to speak hands-free
               </span>
             </div>
@@ -602,7 +626,7 @@ export default function App() {
 
       {/* Main Assistant Window when Open */}
       {isOpen && (
-        <main className="relative z-10 w-full h-full sm:h-[88vh] sm:max-h-[660px] sm:max-w-[390px] flex flex-col justify-center items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200 shadow-2xl rounded-none sm:rounded-2xl overflow-hidden border border-slate-200/90">
+        <main className="relative z-10 w-full max-w-[360px] h-[min(560px,calc(100dvh-16px))] sm:h-[580px] flex flex-col justify-center items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
           <AssistantPanel
             voiceState={voiceState}
             messages={messages}
