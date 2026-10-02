@@ -10,7 +10,8 @@ dotenv.config();
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Comprehensive CORS & Iframe embedding headers (supports WordPress, HFCM, Elementor, VP Iframe)
 app.use((req, res, next) => {
@@ -846,6 +847,81 @@ app.get("/api/welcome-audio", (req, res) => {
   return res.status(404).send("Welcome audio not found");
 });
 
+// Dedicated Real-Time Audio Transcription endpoint (supports iOS Safari audio/mp4, Android Chrome audio/webm, and audio/wav)
+app.post("/api/transcribe", async (req, res) => {
+  try {
+    const { audio, mimeType } = req.body;
+    if (!audio || typeof audio !== "string") {
+      return res.status(400).json({ error: "Audio base64 is required" });
+    }
+
+    const ai = getGeminiClient();
+    const cleanMime = (mimeType || "audio/webm").split(";")[0]; // Strip codec parameters like ;codecs=opus
+
+    // Try gemini-3.5-transcribe first, then fall back to gemini-3.8-flash if needed
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-transcribe",
+        contents: [
+          {
+            parts: [
+              {
+                inlineData: {
+                  data: audio,
+                  mimeType: cleanMime
+                }
+              }
+            ]
+          }
+        ]
+      });
+
+      const parts = response.candidates?.[0]?.content?.parts || [];
+      let text = "";
+      for (const p of parts) {
+        if ((p as any).audioTranscription?.text) {
+          text += (p as any).audioTranscription.text + " ";
+        } else if (p.text) {
+          text += p.text + " ";
+        }
+      }
+
+      const trimmed = text.trim();
+      if (trimmed) {
+        return res.json({ text: trimmed });
+      }
+    } catch (transcribeErr: any) {
+      console.warn("gemini-3.5-transcribe notice, trying gemini-3.8-flash:", transcribeErr?.message?.slice(0, 80));
+    }
+
+    // Fallback model for audio transcription
+    const fbResponse = await ai.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: [
+        {
+          parts: [
+            {
+              inlineData: {
+                data: audio,
+                mimeType: cleanMime
+              }
+            },
+            {
+              text: "Transcribe the spoken audio verbatim into English. Output only the transcription, nothing else."
+            }
+          ]
+        }
+      ]
+    });
+
+    const fbText = (fbResponse.text || "").trim();
+    return res.json({ text: fbText });
+  } catch (err: any) {
+    console.error("Transcribe API error:", err?.message);
+    return res.status(500).json({ error: "Failed to transcribe audio", text: "" });
+  }
+});
+
 // 3. Lead capture endpoint
 app.post("/api/lead", (req, res) => {
   try {
@@ -915,6 +991,7 @@ app.get("/embed.js", (req, res) => {
   iframe.src = WIDGET_ORIGIN;
   iframe.title = "VisionONE Voice AI Assistant";
   iframe.allow = "microphone *; autoplay *; clipboard-write *";
+  iframe.setAttribute("allow", "microphone *; autoplay *; clipboard-write *");
   iframe.setAttribute("allowtransparency", "true");
   iframe.setAttribute("frameborder", "0");
   iframe.style.width = "100%";

@@ -25,6 +25,7 @@ interface AssistantPanelProps {
   onSelectQuestion: (question: string) => void;
   onPlayVoice: (text: string, audioUrl?: string) => void;
   onSubmitTranscript?: () => void;
+  onSendMessage?: (msg: string) => void;
   onOpenCta: (type: 'demo' | 'contact' | 'quote') => void;
   onRestartConversation?: () => void;
   micDisabled?: boolean;
@@ -49,6 +50,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   onToggleMic,
   onRetry,
   onSelectQuestion,
+  onSendMessage,
   onPlayVoice,
   onSubmitTranscript,
   onOpenCta,
@@ -120,6 +122,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
           onPlayVoice={onPlayVoice}
           onSubmitTranscript={onSubmitTranscript}
           onSelectQuestion={onSelectQuestion}
+          onSendMessage={onSendMessage}
           onOpenCta={onOpenCta}
           onClose={onClose}
           onRestartConversation={onRestartConversation}

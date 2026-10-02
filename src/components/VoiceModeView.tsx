@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { VoiceState, ChatMessage } from '../types';
 import { VoiceOrb } from './VoiceOrb';
 import {
@@ -30,6 +30,7 @@ interface VoiceModeViewProps {
   onPlayVoice: (text: string, audioUrl?: string) => void;
   onSubmitTranscript?: () => void;
   onSelectQuestion: (question: string) => void;
+  onSendMessage?: (msg: string) => void;
   onOpenCta: (type: 'demo' | 'contact' | 'quote') => void;
   onClose?: () => void;
   onRestartConversation?: () => void;
@@ -52,11 +53,13 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
   onPlayVoice,
   onSubmitTranscript,
   onSelectQuestion,
+  onSendMessage,
   onOpenCta,
   onClose,
   onRestartConversation,
   micDisabled = false,
 }) => {
+  const [typedMessage, setTypedMessage] = useState('');
   const isListening = voiceState === 'listening';
   const isSpeaking = voiceState === 'speaking';
   const isThinking = voiceState === 'thinking';
@@ -336,6 +339,36 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
               ))}
             </div>
           </div>
+        )}
+
+        {/* Universal Text Input Fallback (for noisy environments or mobile devices) */}
+        {!isConversationOver && onSendMessage && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (typedMessage.trim() && !isThinking) {
+                onSendMessage(typedMessage.trim());
+                setTypedMessage('');
+              }
+            }}
+            className="w-full mt-1 flex items-center gap-1.5 px-0.5"
+          >
+            <input
+              type="text"
+              value={typedMessage}
+              onChange={(e) => setTypedMessage(e.target.value)}
+              placeholder={isListening ? "Listening... or type here" : "Ask by voice or text..."}
+              className="flex-1 bg-white/80 border border-slate-200/90 rounded-full px-3 py-1 text-[11px] font-['Inter'] text-[#111A3A] placeholder:text-[#111A3A]/45 focus:outline-none focus:border-[#1D8DE6] shadow-2xs transition"
+            />
+            <button
+              type="submit"
+              disabled={!typedMessage.trim() || isThinking}
+              className="w-6 h-6 rounded-full bg-[#1D8DE6] hover:bg-[#111A3A] text-white flex items-center justify-center shrink-0 disabled:opacity-35 disabled:cursor-not-allowed shadow-2xs cursor-pointer active:scale-95 transition"
+              title="Send text message"
+            >
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </form>
         )}
       </div>
     </div>

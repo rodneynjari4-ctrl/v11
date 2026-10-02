@@ -81,7 +81,6 @@ export default function App() {
     }
 
     setVoiceState('listening');
-    speechRecognitionRef.current.resumeListeningAfterAgentTurn();
 
     speechRecognitionRef.current.start(
       (text: string, isFinal: boolean) => {
@@ -94,7 +93,7 @@ export default function App() {
       },
       (error: string) => {
         console.warn('Recognition notice:', error);
-        if (error.includes('restricted') || error.includes('not supported')) {
+        if (error.includes('restricted') || error.includes('not supported') || error.includes('not permitted')) {
           setVoiceState('idle');
         } else if (!isAutoListeningRef.current || isConversationOverRef.current) {
           setVoiceState('idle');
@@ -432,6 +431,9 @@ export default function App() {
   processUserMessageRef.current = processUserMessage;
 
   const toggleMic = () => {
+    // Prime mic permission during user gesture on mobile
+    speechRecognitionRef.current?.primePermission();
+
     if (!hasStarted) {
       handleOpenAssistant();
       return;
@@ -456,6 +458,9 @@ export default function App() {
   };
 
   const handleSelectQuestion = (question: string) => {
+    // Prime mic permission during user gesture on mobile
+    speechRecognitionRef.current?.primePermission();
+
     if (!isOpen) {
       setIsOpen(true);
       setIsDismissed(false);
@@ -467,6 +472,9 @@ export default function App() {
   };
 
   const handleRestartConversation = () => {
+    // Prime mic permission during user gesture on mobile
+    speechRecognitionRef.current?.primePermission();
+
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.stop();
     }
@@ -499,6 +507,9 @@ export default function App() {
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.resume();
     }
+
+    // Prime microphone permission during this direct user tap/click gesture
+    speechRecognitionRef.current?.primePermission();
 
     // Synchronous execution within the user's click handler guarantees zero-latency instant speech
     speechSynthesisRef.current?.playWelcomeImmediately({
@@ -653,6 +664,7 @@ export default function App() {
             onRetry={startListening}
             onSubmitTranscript={() => speechRecognitionRef.current?.submitNow()}
             onSelectQuestion={handleSelectQuestion}
+            onSendMessage={(msg) => processUserMessage(msg)}
             onPlayVoice={(t, audioUrl) => speakVoice(t, !isConversationOver, audioUrl)}
             onOpenCta={(type) => {
               setLeadModalType(type);
