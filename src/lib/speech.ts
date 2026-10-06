@@ -141,6 +141,8 @@ export class SpeechRecognitionManager {
   private audioChunks: Blob[] = [];
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
+  private sourceNode: MediaStreamAudioSourceNode | null = null;
+  private dummyGain: GainNode | null = null;
   private dataArray: Uint8Array | null = null;
   private vadInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -160,38 +162,84 @@ export class SpeechRecognitionManager {
 
   private hasRequestedMicPermission = false;
   private recordedMimeType = 'audio/webm';
+  private maxUtteranceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
+    this.detectSupportedMime();
     this.startWatchdog();
+  }
+
+  private detectSupportedMime(): string {
+    if (typeof MediaRecorder === 'undefined') {
+      this.recordedMimeType = 'audio/webm';
+      return this.recordedMimeType;
+    }
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/aac',
+      'audio/ogg'
+    ];
+    for (const c of candidates) {
+      if (MediaRecorder.isTypeSupported(c)) {
+        this.recordedMimeType = c;
+        return c;
+      }
+    }
+    this.recordedMimeType = '';
+    return '';
   }
 
   private startWatchdog() {
     if (this.watchdogTimer) {
       clearInterval(this.watchdogTimer);
     }
-    // Check every 2.5 seconds: if hands-free listening is intended but inactive, revive immediately!
+    // Check every 2 seconds: if hands-free listening is desired but inactive, revive immediately
     this.watchdogTimer = setInterval(() => {
       if (this.shouldBeListening && !this.isSpeakingOrThinking && !this.isListening) {
         this.safeStartAllEngines();
       }
-    }, 2500);
+    }, 2000);
   }
 
   public async primePermission(): Promise<boolean> {
-    if (this.hasRequestedMicPermission && this.mediaStream) return true;
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       return false;
     }
+
     try {
+      // Resume existing or create audio context within user gesture
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        if (!this.audioContext || this.audioContext.state === 'closed') {
+          this.audioContext = new AudioCtx();
+        }
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume().catch(() => {});
+        }
+      }
+
+      if (this.mediaStream && this.mediaStream.active && this.mediaStream.getAudioTracks().length > 0) {
+        this.hasRequestedMicPermission = true;
+        this.setupAudioAnalyser(this.mediaStream);
+        return true;
+      }
+
       this.hasRequestedMicPermission = true;
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
+
       this.mediaStream = stream;
       this.setupAudioAnalyser(stream);
       return true;
     } catch (err) {
-      console.warn('Microphone permission check notice:', err);
+      console.warn('Microphone permission priming notice:', err);
       return false;
     }
   }
@@ -206,12 +254,31 @@ export class SpeechRecognitionManager {
       if (this.audioContext.state === 'suspended') {
         this.audioContext.resume().catch(() => {});
       }
-      const source = this.audioContext.createMediaStreamSource(stream);
+
+      // Disconnect existing nodes if re-initializing
+      if (this.sourceNode) {
+        try { this.sourceNode.disconnect(); } catch {}
+      }
+      if (this.dummyGain) {
+        try { this.dummyGain.disconnect(); } catch {}
+      }
+      if (this.analyser) {
+        try { this.analyser.disconnect(); } catch {}
+      }
+
+      this.sourceNode = this.audioContext.createMediaStreamSource(stream);
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = 256;
-      this.analyser.smoothingTimeConstant = 0.5;
-      source.connect(this.analyser);
-      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+      this.analyser.smoothingTimeConstant = 0.3;
+      this.sourceNode.connect(this.analyser);
+
+      // WebKit keep-alive: route through silent gain to destination so iOS doesn't sleep the audio graph
+      this.dummyGain = this.audioContext.createGain();
+      this.dummyGain.gain.value = 0;
+      this.analyser.connect(this.dummyGain);
+      this.dummyGain.connect(this.audioContext.destination);
+
+      this.dataArray = new Uint8Array(this.analyser.fftSize);
     } catch (e) {
       console.warn('Audio analyzer setup notice:', e);
     }
@@ -219,6 +286,7 @@ export class SpeechRecognitionManager {
 
   private async startMediaRecording(): Promise<boolean> {
     try {
+      // Ensure active microphone stream exists
       if (!this.mediaStream || !this.mediaStream.active || this.mediaStream.getAudioTracks().length === 0) {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
@@ -226,30 +294,23 @@ export class SpeechRecognitionManager {
         this.mediaStream = stream;
         this.setupAudioAnalyser(stream);
       } else {
+        // Enable tracks if they were muted during agent speech
+        this.mediaStream.getAudioTracks().forEach(t => { t.enabled = true; });
         this.setupAudioAnalyser(this.mediaStream);
       }
 
       this.audioChunks = [];
       this.speechDetected = false;
 
-      // Select best supported MIME type across iOS Safari and Android Chrome
-      let mimeType = '';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-          mimeType = 'audio/webm;codecs=opus';
-        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
-          mimeType = 'audio/webm';
-        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-          mimeType = 'audio/mp4';
-        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-          mimeType = 'audio/aac';
-        }
-      }
-
-      this.recordedMimeType = mimeType || 'audio/webm';
-
+      const mimeType = this.detectSupportedMime();
       const options = mimeType ? { mimeType } : undefined;
-      this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
+
+      try {
+        this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
+      } catch (mimeErr) {
+        // Fallback to browser default MediaRecorder if specific MIME failed
+        this.mediaRecorder = new MediaRecorder(this.mediaStream);
+      }
 
       this.mediaRecorder.ondataavailable = (event: BlobEvent) => {
         if (event.data && event.data.size > 0) {
@@ -257,9 +318,19 @@ export class SpeechRecognitionManager {
         }
       };
 
-      this.mediaRecorder.start(200); // 200ms timeslices
+      this.mediaRecorder.start(100); // 100ms timeslices for prompt audio chunk collection
 
-      // Voice Activity Detection (VAD) via real microphone audio energy
+      // Safety timeout: auto-submit after 12 seconds of continuous talking so user is never stuck
+      if (this.maxUtteranceTimer) {
+        clearTimeout(this.maxUtteranceTimer);
+      }
+      this.maxUtteranceTimer = setTimeout(() => {
+        if (this.isListening && !this.isSpeakingOrThinking && !this.isSubmitted) {
+          this.submitNow();
+        }
+      }, 12000);
+
+      // Voice Activity Detection (VAD) via real time-domain RMS
       if (this.vadInterval) {
         clearInterval(this.vadInterval);
       }
@@ -267,26 +338,26 @@ export class SpeechRecognitionManager {
       this.vadInterval = setInterval(() => {
         if (!this.isListening || this.isSpeakingOrThinking) return;
 
-        const currentAmp = this.getMicAmplitude();
+        const amp = this.getMicAmplitude();
 
-        // Speech threshold: detect when user speaks
-        if (currentAmp > 0.14) {
+        // Speech threshold: amp > 0.025 indicates active human voice on phone or desktop
+        if (amp > 0.025) {
           this.speechDetected = true;
           if (this.silenceTimer) {
             clearTimeout(this.silenceTimer);
             this.silenceTimer = null;
           }
-        } else if (this.speechDetected && currentAmp <= 0.1) {
-          // User paused speaking: auto-submit after 1.3s of silence
+        } else if (this.speechDetected && amp <= 0.018) {
+          // User paused speaking: auto-submit after 1.1s of silence
           if (!this.silenceTimer) {
             this.silenceTimer = setTimeout(() => {
               if (this.speechDetected && !this.isSubmitted && !this.isSpeakingOrThinking) {
                 this.submitNow();
               }
-            }, 1300);
+            }, 1100);
           }
         }
-      }, 100);
+      }, 80);
 
       return true;
     } catch (err: any) {
@@ -345,11 +416,11 @@ export class SpeechRecognitionManager {
             if (!this.isSubmitted && this.lastTranscript.trim() && !this.isSpeakingOrThinking) {
               this.submitNow();
             }
-          }, 1200);
+          }, 1100);
         }
       };
 
-      rec.onerror = (e: any) => {
+      rec.onerror = (_e: any) => {
         // Handled silently by MediaRecorder engine fallback
       };
 
@@ -361,8 +432,8 @@ export class SpeechRecognitionManager {
 
       this.recognition = rec;
       rec.start();
-    } catch (err) {
-      // Ignored: MediaRecorder handles recording
+    } catch {
+      // Ignored: MediaRecorder handles recording reliably
     }
   }
 
@@ -383,13 +454,16 @@ export class SpeechRecognitionManager {
       return 0;
     }
     try {
-      this.analyser.getByteFrequencyData(this.dataArray);
-      let sum = 0;
+      // Use time-domain waveform data to calculate true RMS audio amplitude
+      this.analyser.getByteTimeDomainData(this.dataArray);
+      let sumSquares = 0;
       for (let i = 0; i < this.dataArray.length; i++) {
-        sum += this.dataArray[i];
+        const normalized = (this.dataArray[i] - 128) / 128;
+        sumSquares += normalized * normalized;
       }
-      const avg = sum / this.dataArray.length;
-      return Math.min(1, avg / 60);
+      const rms = Math.sqrt(sumSquares / this.dataArray.length);
+      // Scale RMS (typically 0.01 - 0.25) to a clean 0.0 - 1.0 range
+      return Math.min(1, Math.max(0, rms * 4.5));
     } catch {
       return 0;
     }
@@ -403,39 +477,52 @@ export class SpeechRecognitionManager {
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
     }
+    if (this.maxUtteranceTimer) {
+      clearTimeout(this.maxUtteranceTimer);
+      this.maxUtteranceTimer = null;
+    }
 
     const liveText = this.lastTranscript.trim();
-    this.pauseListeningForAgentTurn();
 
     // 1. If Web Speech API already captured the text (e.g. on Desktop Chrome), use it immediately!
     if (liveText) {
       this.lastTranscript = '';
+      this.pauseListeningForAgentTurn();
       this.onResultCallback?.(liveText, true);
       return true;
     }
 
-    // 2. Otherwise (e.g. on iOS Safari / mobile where Web Speech is blocked), transcribe recorded audio with Gemini!
+    // 2. Otherwise (e.g. on iOS Safari / mobile browsers), flush & stop MediaRecorder and transcribe with Gemini!
     try {
       if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
         const recorder = this.mediaRecorder;
-        const stoppedPromise = new Promise<void>((resolve) => {
+        await new Promise<void>((resolve) => {
           recorder.onstop = () => resolve();
+          try {
+            if (recorder.state === 'recording') {
+              recorder.requestData();
+            }
+            recorder.stop();
+          } catch {
+            resolve();
+          }
         });
-        recorder.stop();
-        await stoppedPromise;
       }
 
+      // Now that audio is fully flushed into this.audioChunks, transition listening state
+      this.pauseListeningForAgentTurn();
+
       if (this.audioChunks.length === 0) {
-        // No audio captured, resume listening if appropriate
         this.resumeListeningAfterAgentTurn();
         return false;
       }
 
-      const audioBlob = new Blob(this.audioChunks, { type: this.recordedMimeType });
+      const effectiveMime = this.recordedMimeType || this.mediaRecorder?.mimeType || 'audio/mp4';
+      const audioBlob = new Blob(this.audioChunks, { type: effectiveMime });
       this.audioChunks = [];
 
-      // Only transcribe if audio has substantial content (> 1500 bytes)
-      if (audioBlob.size < 1500) {
+      // Accept any recorded speech chunk (> 150 bytes)
+      if (audioBlob.size < 150) {
         this.resumeListeningAfterAgentTurn();
         return false;
       }
@@ -447,7 +534,7 @@ export class SpeechRecognitionManager {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           audio: base64Audio,
-          mimeType: this.recordedMimeType,
+          mimeType: effectiveMime,
         }),
       });
 
@@ -462,7 +549,7 @@ export class SpeechRecognitionManager {
         this.onResultCallback?.(transcribedText, true);
         return true;
       } else {
-        // Empty transcription (e.g. background noise), resume hands-free listening
+        // Empty transcription (e.g. background hiss), smoothly resume listening
         this.resumeListeningAfterAgentTurn();
         return false;
       }
@@ -481,6 +568,10 @@ export class SpeechRecognitionManager {
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
     }
+    if (this.maxUtteranceTimer) {
+      clearTimeout(this.maxUtteranceTimer);
+      this.maxUtteranceTimer = null;
+    }
     if (this.vadInterval) {
       clearInterval(this.vadInterval);
       this.vadInterval = null;
@@ -491,6 +582,11 @@ export class SpeechRecognitionManager {
         this.mediaRecorder.stop();
       }
     } catch {}
+
+    // Disable audio tracks temporarily so microphone doesn't pick up speaker sound
+    if (this.mediaStream) {
+      this.mediaStream.getAudioTracks().forEach(t => { t.enabled = false; });
+    }
 
     try {
       this.recognition?.abort();
@@ -697,8 +793,12 @@ export class SpeechSynthesisManager {
 
     if (this.currentAudio) {
       try {
-        this.currentAudio.pause();
-        this.currentAudio.currentTime = 0;
+        const audio = this.currentAudio;
+        audio.onplay = null;
+        audio.onended = null;
+        audio.onerror = null;
+        audio.pause();
+        audio.currentTime = 0;
       } catch {}
       this.currentAudio = null;
     }

@@ -29,6 +29,8 @@ interface VoiceModeViewProps {
   onRetry: () => void;
   onPlayVoice: (text: string, audioUrl?: string) => void;
   onSubmitTranscript?: () => void;
+  onStopSpeaking?: () => void;
+  onStopListening?: () => void;
   onSelectQuestion: (question: string) => void;
   onSendMessage?: (msg: string) => void;
   onOpenCta: (type: 'demo' | 'contact' | 'quote') => void;
@@ -52,6 +54,8 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
   onRetry,
   onPlayVoice,
   onSubmitTranscript,
+  onStopSpeaking,
+  onStopListening,
   onSelectQuestion,
   onSendMessage,
   onOpenCta,
@@ -144,7 +148,7 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
   return (
     <div
       id="visionone-voice-view"
-      className="flex-1 flex flex-col justify-between items-center px-3 py-2 sm:py-2.5 overflow-y-auto min-h-0 bg-transparent select-none text-[#111A3A]"
+      className="flex-1 flex flex-col justify-between items-center px-3 py-2 sm:py-2.5 overflow-y-auto min-h-0 bg-transparent text-[#111A3A]"
     >
       {/* Top Status & Hands-free Mode indicator */}
       <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
@@ -160,33 +164,54 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
           state={voiceState}
           amplitude={micAmplitude}
           onRetry={onRetry}
-          onClick={onToggleMic}
+          onClick={
+            isSpeaking
+              ? (onStopSpeaking || onToggleMic)
+              : isListening
+              ? (onSubmitTranscript || onToggleMic)
+              : onToggleMic
+          }
           hasStarted={hasStarted}
         />
 
+        {/* Mobile Real-Time Live Audio Wave Equalizer (Confirms mic is picking up voice on mobile) */}
+        {isListening && (
+          <div className="flex items-center justify-center gap-1.5 h-6 mt-1 animate-in fade-in duration-200">
+            {[0.4, 0.7, 1.2, 0.6, 1.1, 0.5, 0.9].map((scale, i) => {
+              const barHeight = Math.max(4, Math.min(22, 5 + micAmplitude * 32 * scale));
+              return (
+                <span
+                  key={i}
+                  className="w-1 rounded-full bg-gradient-to-t from-[#1D8DE6] to-[#35A6F7] transition-all duration-75 shadow-xs"
+                  style={{ height: `${barHeight}px` }}
+                />
+              );
+            })}
+            <span className="text-[9px] text-[#1D8DE6] font-semibold ml-1 font-['Sora']">
+              {micAmplitude > 0.05 ? 'Hearing voice' : 'Listening...'}
+            </span>
+          </div>
+        )}
+
         {/* Live Conversation Transcript Card */}
-        <div className="w-full max-w-[325px] mt-2 space-y-1.5">
+        <div className="w-full max-w-[340px] mt-2 space-y-1.5 px-0.5">
           {/* Live speech feedback while user is actively talking */}
           {liveTranscript && isListening && (
-            <div className="glass-card rounded-xl p-2 text-xs text-[#111A3A] flex flex-col gap-1 shadow-xs border-[#1D8DE6]/40 animate-pulse">
+            <div className="glass-card rounded-xl p-2.5 text-xs text-[#111A3A] flex flex-col gap-1.5 shadow-sm border-[#1D8DE6]/50 animate-pulse">
               <div className="flex items-center justify-between text-[10px] text-[#1D8DE6] font-semibold font-['Sora']">
-                <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                  Hearing you:
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  Hearing you speak:
                 </span>
-                {onSubmitTranscript ? (
+                {onSubmitTranscript && (
                   <button
                     onClick={onSubmitTranscript}
-                    className="px-2 py-0.5 rounded-full bg-[#1D8DE6] hover:bg-[#111A3A] text-white text-[9px] font-semibold transition cursor-pointer flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-full bg-[#1D8DE6] hover:bg-[#111A3A] text-white text-[10px] font-semibold transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
                     title="Send message immediately"
                   >
-                    <span>Done</span>
+                    <span>Send</span>
                     <ArrowRight className="w-2.5 h-2.5" />
                   </button>
-                ) : (
-                  <span className="text-[9px] text-[#111A3A]/60 font-normal font-['Inter']">
-                    Pause when finished
-                  </span>
                 )}
               </div>
               <p className="font-['Inter'] font-medium text-[#111A3A] italic leading-snug text-[11px]">
@@ -196,7 +221,7 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
           )}
 
           {lastUserMessage && !liveTranscript && (
-            <div className="bg-[#1D8DE6]/85 backdrop-blur-md text-white rounded-xl px-2.5 py-1 text-[11px] flex items-center justify-between shadow-2xs border border-white/20">
+            <div className="bg-[#1D8DE6]/90 backdrop-blur-md text-white rounded-xl px-3 py-1.5 text-[11px] flex items-center justify-between shadow-2xs border border-white/20">
               <span className="text-[9px] font-bold uppercase tracking-wider font-['Sora'] mr-2 shrink-0 opacity-90">
                 You:
               </span>
@@ -205,7 +230,7 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
           )}
 
           {lastAssistantMessage && (
-            <div className="glass-card rounded-2xl p-2.5 border border-white/70 shadow-xs space-y-1">
+            <div className="glass-card rounded-2xl p-2.5 border border-white/70 shadow-xs space-y-1 max-h-32 overflow-y-auto">
               <div className="flex items-center justify-between text-[10px] text-[#111A3A]/70">
                 <span className="font-bold flex items-center gap-1 text-[#1D8DE6] font-['Sora']">
                   <Sparkles className="w-2.5 h-2.5" /> Assistant:
@@ -213,7 +238,7 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
                 <div className="flex items-center gap-1.5">
                   {lastAssistantMessage.qaScore && (
                     <span
-                      className="inline-flex items-center gap-0.5 text-[8px] font-medium text-emerald-700 bg-emerald-50/80 border border-emerald-200/60 px-1 py-0.1 rounded-sm font-['IBM_Plex_Mono']"
+                      className="inline-flex items-center gap-0.5 text-[8px] font-medium text-emerald-700 bg-emerald-50/80 border border-emerald-200/60 px-1 py-0.2 rounded-sm font-['IBM_Plex_Mono']"
                       title={lastAssistantMessage.qaCritique || "QA Critic Verified"}
                     >
                       <ShieldCheck className="w-2 h-2 text-emerald-500" />
@@ -237,14 +262,14 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
                   )}
                 </div>
               </div>
-              <p className="text-[11px] font-['Inter'] text-[#111A3A] leading-relaxed line-clamp-3">
+              <p className="text-[11px] font-['Inter'] text-[#111A3A] leading-relaxed">
                 {lastAssistantMessage.voiceText || lastAssistantMessage.text}
               </p>
 
               {lastAssistantMessage.cta && (
                 <button
                   onClick={() => onOpenCta(lastAssistantMessage.cta!.type)}
-                  className="w-full mt-1 py-1 px-2.5 rounded-lg bg-[#111A3A] hover:bg-[#1D8DE6] text-white text-[10px] font-semibold flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer"
+                  className="w-full mt-1.5 py-1.5 px-3 rounded-lg bg-[#111A3A] hover:bg-[#1D8DE6] text-white text-[10px] font-semibold flex items-center justify-center gap-1 transition shadow-xs cursor-pointer active:scale-95"
                 >
                   <span>{lastAssistantMessage.cta.label}</span>
                   <ArrowRight className="w-2.5 h-2.5" />
@@ -255,66 +280,90 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
         </div>
       </div>
 
-      {/* Primary Voice Controls */}
+      {/* Primary Mobile Voice Controls */}
       <div className="w-full flex flex-col items-center gap-1.5 pt-0.5 shrink-0">
         {!isConversationOver ? (
-          <div className="flex flex-col items-center gap-0.5">
-            {/* Hands-free Toggle / Start Mic Button */}
-            <button
-              type="button"
-              onClick={onToggleMic}
-              disabled={micDisabled || isThinking}
-              aria-label={
-                !hasStarted
-                  ? 'Tap to speak'
-                  : isListening
-                  ? 'Pause listening'
-                  : isSpeaking
-                  ? 'Interrupt speaking'
-                  : 'Resume listening'
-              }
-              className={`w-12 h-12 sm:w-13 sm:h-13 rounded-full flex items-center justify-center shadow-md transition-all duration-200 cursor-pointer active:scale-95 focus:outline-none focus:ring-3 ${
-                !hasStarted && voiceState === 'idle'
-                  ? 'bg-gradient-to-tr from-[#111A3A] via-[#1D8DE6] to-[#35A6F7] text-white shadow-[#1D8DE6]/35 ring-3 ring-[#1D8DE6]/30 hover:scale-105 animate-pulse'
-                  : isListening
-                  ? 'bg-emerald-600 text-white shadow-emerald-600/35 ring-emerald-300 animate-pulse'
-                  : isSpeaking
-                  ? 'bg-[#111A3A] text-white shadow-[#111A3A]/25 ring-[#1D8DE6]/40 hover:bg-[#1D8DE6]'
-                  : 'bg-gradient-to-tr from-[#1D8DE6] to-[#35A6F7] text-white shadow-[#1D8DE6]/25 ring-[#1D8DE6]/25 hover:scale-105'
-              }`}
-            >
-              {isThinking ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : isListening ? (
-                <Mic className="w-5 h-5 sm:w-6 sm:h-6 animate-pulse" />
-              ) : isSpeaking ? (
-                <Square className="w-4 h-4 fill-current" />
-              ) : (
-                <Mic className="w-5 h-5 sm:w-6 sm:h-6" />
+          <div className="flex flex-col items-center gap-1 w-full">
+            {/* Primary Action Button */}
+            <div className="flex items-center justify-center gap-3">
+              {/* Secondary Stop/Cancel button when listening */}
+              {isListening && (
+                <button
+                  type="button"
+                  onClick={onStopListening || onToggleMic}
+                  className="w-11 h-11 rounded-full flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 shadow-sm transition-all cursor-pointer active:scale-95"
+                  title="Cancel & Stop Listening"
+                  aria-label="Cancel & Stop Listening"
+                >
+                  <Square className="w-4 h-4 fill-current" />
+                </button>
               )}
-            </button>
 
-            <span className="text-[9px] font-semibold text-[#111A3A]/75 font-['Sora'] tracking-tight">
-              {!hasStarted && voiceState === 'idle'
-                ? 'Tap to Speak'
-                : isListening
-                ? 'Listening...'
-                : isSpeaking
-                ? 'Tap to Pause'
-                : isThinking
-                ? 'Thinking...'
-                : 'Tap to Speak'}
-            </span>
+              <button
+                type="button"
+                onClick={
+                  isSpeaking
+                    ? (onStopSpeaking || onToggleMic)
+                    : isListening
+                    ? (onSubmitTranscript || onToggleMic)
+                    : onToggleMic
+                }
+                disabled={micDisabled || isThinking}
+                aria-label={
+                  !hasStarted
+                    ? 'Tap to speak'
+                    : isListening
+                    ? 'Send recorded voice'
+                    : isSpeaking
+                    ? 'Stop speaking'
+                    : 'Tap to speak'
+                }
+                className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 cursor-pointer active:scale-95 focus:outline-none focus:ring-4 ${
+                  !hasStarted && voiceState === 'idle'
+                    ? 'bg-gradient-to-tr from-[#111A3A] via-[#1D8DE6] to-[#35A6F7] text-white shadow-[#1D8DE6]/35 ring-4 ring-[#1D8DE6]/30 hover:scale-105 animate-pulse'
+                    : isListening
+                    ? 'bg-emerald-600 text-white shadow-emerald-600/40 ring-4 ring-emerald-300 animate-pulse'
+                    : isSpeaking
+                    ? 'bg-rose-600 text-white shadow-rose-600/35 ring-4 ring-rose-300 hover:bg-rose-700'
+                    : 'bg-gradient-to-tr from-[#1D8DE6] to-[#35A6F7] text-white shadow-[#1D8DE6]/30 ring-4 ring-[#1D8DE6]/25 hover:scale-105'
+                }`}
+              >
+                {isThinking ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : isListening ? (
+                  <ArrowRight className="w-6 h-6 text-white stroke-[2.5]" />
+                ) : isSpeaking ? (
+                  <Square className="w-5 h-5 fill-current" />
+                ) : (
+                  <Mic className="w-6 h-6" />
+                )}
+              </button>
+            </div>
+
+            {/* Clear Mobile Status & Action Instruction */}
+            <div className="text-center">
+              <span className="text-[10px] font-semibold text-[#111A3A] font-['Sora'] tracking-tight block">
+                {!hasStarted && voiceState === 'idle'
+                  ? 'Tap to Speak'
+                  : isListening
+                  ? 'Tap Send (or Stop to cancel)'
+                  : isSpeaking
+                  ? 'Stop Speaking'
+                  : isThinking
+                  ? 'Thinking...'
+                  : 'Tap to Speak'}
+              </span>
+            </div>
           </div>
         ) : (
           /* When conversation is over, provide explicit restart action */
-          <div className="flex items-center justify-center">
+          <div className="flex items-center justify-center py-1">
             {onRestartConversation && (
               <button
                 onClick={onRestartConversation}
-                className="px-4 py-2 rounded-full bg-[#1D8DE6] hover:bg-[#111A3A] text-white text-[11px] font-semibold font-['Sora'] shadow-md flex items-center gap-1.5 transition cursor-pointer active:scale-95"
+                className="px-5 py-2.5 rounded-full bg-[#1D8DE6] hover:bg-[#111A3A] text-white text-xs font-semibold font-['Sora'] shadow-md flex items-center gap-1.5 transition cursor-pointer active:scale-95"
               >
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw className="w-3.5 h-3.5" />
                 <span>Start New Conversation</span>
               </button>
             )}
@@ -325,14 +374,14 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
         {suggestedQuestions.length > 0 && !isConversationOver && (
           <div className="w-full flex flex-col items-center gap-0.5 mt-0.5">
             <span className="text-[9px] text-[#111A3A]/60 font-['Inter']">
-              Or tap any topic:
+              Quick topics:
             </span>
-            <div className="w-full flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 justify-start sm:justify-center px-1">
+            <div className="w-full flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 justify-start sm:justify-center px-1">
               {suggestedQuestions.slice(0, 3).map((q, idx) => (
                 <button
                   key={idx}
                   onClick={() => onSelectQuestion(q)}
-                  className="glass-pill shrink-0 text-[9px] font-medium font-['Inter'] px-2 py-0.5 rounded-full hover:bg-white text-[#111A3A] hover:border-[#1D8DE6] transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+                  className="glass-pill shrink-0 text-[10px] font-medium font-['Inter'] px-2.5 py-1 rounded-full hover:bg-white text-[#111A3A] hover:border-[#1D8DE6] transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95"
                 >
                   {q}
                 </button>
@@ -341,7 +390,7 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
           </div>
         )}
 
-        {/* Universal Text Input Fallback (for noisy environments or mobile devices) */}
+        {/* Universal Text Input Fallback (for noisy environments or mobile typing) */}
         {!isConversationOver && onSendMessage && (
           <form
             onSubmit={(e) => {
@@ -351,22 +400,26 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
                 setTypedMessage('');
               }
             }}
-            className="w-full mt-1 flex items-center gap-1.5 px-0.5"
+            className="w-full mt-1 flex items-center gap-1.5 px-0.5 select-text pointer-events-auto"
           >
             <input
               type="text"
+              inputMode="text"
               value={typedMessage}
               onChange={(e) => setTypedMessage(e.target.value)}
-              placeholder={isListening ? "Listening... or type here" : "Ask by voice or text..."}
-              className="flex-1 bg-white/80 border border-slate-200/90 rounded-full px-3 py-1 text-[11px] font-['Inter'] text-[#111A3A] placeholder:text-[#111A3A]/45 focus:outline-none focus:border-[#1D8DE6] shadow-2xs transition"
+              placeholder={isListening ? "Listening... or type here" : "Ask by voice or type..."}
+              className="flex-1 bg-white/95 border border-slate-300 rounded-full px-3 py-1.5 text-xs font-['Inter'] text-[#111A3A] placeholder:text-[#111A3A]/50 focus:outline-none focus:border-[#1D8DE6] shadow-2xs transition select-text pointer-events-auto"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="sentences"
             />
             <button
               type="submit"
               disabled={!typedMessage.trim() || isThinking}
-              className="w-6 h-6 rounded-full bg-[#1D8DE6] hover:bg-[#111A3A] text-white flex items-center justify-center shrink-0 disabled:opacity-35 disabled:cursor-not-allowed shadow-2xs cursor-pointer active:scale-95 transition"
+              className="w-7 h-7 rounded-full bg-[#1D8DE6] hover:bg-[#111A3A] text-white flex items-center justify-center shrink-0 disabled:opacity-35 disabled:cursor-not-allowed shadow-2xs cursor-pointer active:scale-95 transition"
               title="Send text message"
             >
-              <ArrowRight className="w-3 h-3" />
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </form>
         )}

@@ -430,6 +430,20 @@ export default function App() {
 
   processUserMessageRef.current = processUserMessage;
 
+  const handleStopSpeaking = useCallback(() => {
+    speechSynthesisRef.current?.stop();
+    setActivePlayingText(null);
+    setVoiceState('idle');
+    setIsAutoListening(false);
+  }, []);
+
+  const handleStopListening = useCallback(() => {
+    speechRecognitionRef.current?.stop();
+    setLiveTranscript('');
+    setVoiceState('idle');
+    setIsAutoListening(false);
+  }, []);
+
   const toggleMic = () => {
     // Prime mic permission during user gesture on mobile
     speechRecognitionRef.current?.primePermission();
@@ -445,12 +459,11 @@ export default function App() {
     }
 
     if (voiceState === 'listening') {
-      setIsAutoListening(false);
-      stopListening();
+      // User tapped while listening -> submit their speech turn immediately!
+      speechRecognitionRef.current?.submitNow();
     } else if (voiceState === 'speaking') {
-      speechSynthesisRef.current?.stop();
-      setIsAutoListening(true);
-      startListening();
+      // User tapped Stop while AI is speaking -> stop speaking immediately!
+      handleStopSpeaking();
     } else {
       setIsAutoListening(true);
       startListening();
@@ -607,14 +620,14 @@ export default function App() {
 
   return (
     <div
-      className={`fixed inset-0 flex flex-col justify-end items-end p-2 select-none overflow-hidden font-['Inter'] transition-colors duration-200 ${
+      className={`fixed inset-0 flex flex-col justify-end items-end p-2 overflow-hidden font-['Inter'] transition-colors duration-200 ${
         isOpen ? 'pointer-events-auto' : 'pointer-events-none'
       }`}
       style={{ background: 'transparent' }}
     >
       {/* Launcher State (Floating Capsule) */}
       {!isOpen && (
-        <div className="pointer-events-auto flex items-end justify-end animate-in fade-in zoom-in-95 duration-200">
+        <div className="pointer-events-auto flex items-end justify-end animate-in fade-in zoom-in-95 duration-200 select-none">
           <button
             onClick={handleOpenAssistant}
             className="group flex items-center gap-2 px-3.5 py-2 rounded-full glass-dark-capsule text-white shadow-xl hover:shadow-[#1D8DE6]/35 hover:scale-102 active:scale-98 transition-all cursor-pointer border border-white/25"
@@ -637,7 +650,7 @@ export default function App() {
 
       {/* Main Assistant Window when Open */}
       {isOpen && (
-        <main className="relative z-10 w-full max-w-[360px] h-[min(560px,calc(100dvh-16px))] sm:h-[580px] flex flex-col justify-center items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
+        <main className="relative z-10 w-full max-w-[390px] h-[min(620px,calc(100dvh-16px))] flex flex-col justify-center items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200 mb-[env(safe-area-inset-bottom,0px)]">
           <AssistantPanel
             voiceState={voiceState}
             messages={messages}
@@ -652,6 +665,7 @@ export default function App() {
             onReset={handleRestartConversation}
             onRestartConversation={handleRestartConversation}
             onMinimize={handleMinimizeAssistant}
+            onClose={handleDismissCompletely}
             onOpenEmbedGuide={() => setIsEmbedModalOpen(true)}
             onToggleMute={() => {
               if (!voiceSettings.isMuted) {
@@ -661,6 +675,8 @@ export default function App() {
               setVoiceSettings((prev) => ({ ...prev, isMuted: !prev.isMuted }));
             }}
             onToggleMic={toggleMic}
+            onStopSpeaking={handleStopSpeaking}
+            onStopListening={handleStopListening}
             onRetry={startListening}
             onSubmitTranscript={() => speechRecognitionRef.current?.submitNow()}
             onSelectQuestion={handleSelectQuestion}

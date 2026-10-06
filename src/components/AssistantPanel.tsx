@@ -25,6 +25,8 @@ interface AssistantPanelProps {
   onSelectQuestion: (question: string) => void;
   onPlayVoice: (text: string, audioUrl?: string) => void;
   onSubmitTranscript?: () => void;
+  onStopSpeaking?: () => void;
+  onStopListening?: () => void;
   onSendMessage?: (msg: string) => void;
   onOpenCta: (type: 'demo' | 'contact' | 'quote') => void;
   onRestartConversation?: () => void;
@@ -53,6 +55,8 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   onSendMessage,
   onPlayVoice,
   onSubmitTranscript,
+  onStopSpeaking,
+  onStopListening,
   onOpenCta,
   onRestartConversation,
   micDisabled = false,
@@ -64,7 +68,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   return (
     <div
       id="visionone-assistant-panel"
-      className="glass-panel relative flex flex-col w-full h-full rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 select-none text-[#111A3A]"
+      className="glass-panel relative flex flex-col w-full h-full rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 text-[#111A3A]"
     >
       {/* Universal Header with Close Button and Critic QA Score */}
       <AssistantHeader
@@ -121,6 +125,8 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
           onRetry={onRetry}
           onPlayVoice={onPlayVoice}
           onSubmitTranscript={onSubmitTranscript}
+          onStopSpeaking={onStopSpeaking}
+          onStopListening={onStopListening}
           onSelectQuestion={onSelectQuestion}
           onSendMessage={onSendMessage}
           onOpenCta={onOpenCta}

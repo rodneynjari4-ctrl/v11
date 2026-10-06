@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, RotateCcw, ShieldCheck, Minus, Code2 } from 'lucide-react';
+import { Volume2, VolumeX, RotateCcw, ShieldCheck, Minus, Code2, X } from 'lucide-react';
 import { VoiceSettings } from '../types';
 
 interface AssistantHeaderProps {
@@ -17,6 +17,7 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
   voiceSettings,
   onToggleMute,
   onMinimize,
+  onClose,
   onOpenEmbedGuide,
   qaScore = 98,
 }) => {
@@ -98,11 +99,22 @@ export const AssistantHeader: React.FC<AssistantHeaderProps> = ({
         {onMinimize && (
           <button
             onClick={onMinimize}
-            className="p-1 rounded-md hover:text-white hover:bg-white/15 transition-colors cursor-pointer ml-0.5"
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
             title="Minimize to floating button"
             aria-label="Minimize to floating button"
           >
             <Minus className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:text-white hover:bg-red-500/25 transition-colors cursor-pointer text-white/80 hover:text-red-200"
+            title="Close Assistant"
+            aria-label="Close Assistant"
+          >
+            <X className="w-3.5 h-3.5" />
           </button>
         )}
       </div>

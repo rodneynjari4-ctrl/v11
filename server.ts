@@ -1021,30 +1021,34 @@ app.get("/embed.js", (req, res) => {
       return;
     }
     container.style.display = "block";
-    var isMobile = window.innerWidth <= 480;
+    var isMobile = window.innerWidth <= 540;
 
     if (open) {
       if (isMobile) {
         container.style.width = "calc(100vw - 16px)";
-        container.style.height = "min(580px, calc(100dvh - 16px))";
+        container.style.height = "min(620px, calc(100dvh - 16px))";
         container.style.bottom = "8px";
         container.style.right = "8px";
         container.style.left = "8px";
       } else {
-        container.style.width = "360px";
-        container.style.height = "580px";
+        container.style.width = "390px";
+        container.style.height = "620px";
         container.style.bottom = "20px";
         container.style.right = "20px";
         container.style.left = "auto";
       }
     } else {
-      container.style.width = "250px";
-      container.style.height = "64px";
-      container.style.bottom = "20px";
-      container.style.right = "20px";
+      container.style.width = isMobile ? "240px" : "270px";
+      container.style.height = isMobile ? "68px" : "76px";
+      container.style.bottom = isMobile ? "12px" : "20px";
+      container.style.right = isMobile ? "12px" : "20px";
       container.style.left = "auto";
     }
   }
+
+  window.addEventListener("resize", function() {
+    adjustWidgetSize(isOpen, false);
+  });
 
   window.addEventListener("message", function(e) {
     if (!e.data || typeof e.data !== "object") return;
