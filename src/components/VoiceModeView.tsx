@@ -283,75 +283,89 @@ export const VoiceModeView: React.FC<VoiceModeViewProps> = ({
       {/* Primary Mobile Voice Controls */}
       <div className="w-full flex flex-col items-center gap-1.5 pt-0.5 shrink-0">
         {!isConversationOver ? (
-          <div className="flex flex-col items-center gap-1 w-full">
-            {/* Primary Action Button */}
-            <div className="flex items-center justify-center gap-3">
-              {/* Secondary Stop/Cancel button when listening */}
-              {isListening && (
+          <div className="flex flex-col items-center gap-1.5 w-full">
+            {/* Action Buttons */}
+            {isSpeaking ? (
+              /* When speaking: prominent wide red STOP button with explicit text */
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={onStopSpeaking || onToggleMic}
+                  className="px-6 py-2.5 rounded-full flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-semibold text-xs font-['Sora'] shadow-lg shadow-rose-600/35 ring-4 ring-rose-200 transition-all cursor-pointer touch-manipulation"
+                  title="Stop speaking and listen"
+                  aria-label="Stop Speaking"
+                >
+                  <Square className="w-4 h-4 fill-current shrink-0" />
+                  <span>Stop Speaking</span>
+                </button>
+              </div>
+            ) : isListening ? (
+              /* When listening: dual controls - Stop/Cancel and Send Voice */
+              <div className="flex items-center justify-center gap-3">
                 <button
                   type="button"
                   onClick={onStopListening || onToggleMic}
-                  className="w-11 h-11 rounded-full flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 shadow-sm transition-all cursor-pointer active:scale-95"
+                  className="px-4 py-2.5 rounded-full flex items-center justify-center gap-1.5 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-600 border border-rose-200 text-xs font-semibold font-['Sora'] shadow-sm transition-all cursor-pointer touch-manipulation"
                   title="Cancel & Stop Listening"
                   aria-label="Cancel & Stop Listening"
                 >
-                  <Square className="w-4 h-4 fill-current" />
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                  <span>Cancel</span>
                 </button>
-              )}
 
-              <button
-                type="button"
-                onClick={
-                  isSpeaking
-                    ? (onStopSpeaking || onToggleMic)
-                    : isListening
-                    ? (onSubmitTranscript || onToggleMic)
-                    : onToggleMic
-                }
-                disabled={micDisabled || isThinking}
-                aria-label={
-                  !hasStarted
-                    ? 'Tap to speak'
-                    : isListening
-                    ? 'Send recorded voice'
-                    : isSpeaking
-                    ? 'Stop speaking'
-                    : 'Tap to speak'
-                }
-                className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 cursor-pointer active:scale-95 focus:outline-none focus:ring-4 ${
-                  !hasStarted && voiceState === 'idle'
-                    ? 'bg-gradient-to-tr from-[#111A3A] via-[#1D8DE6] to-[#35A6F7] text-white shadow-[#1D8DE6]/35 ring-4 ring-[#1D8DE6]/30 hover:scale-105 animate-pulse'
-                    : isListening
-                    ? 'bg-emerald-600 text-white shadow-emerald-600/40 ring-4 ring-emerald-300 animate-pulse'
-                    : isSpeaking
-                    ? 'bg-rose-600 text-white shadow-rose-600/35 ring-4 ring-rose-300 hover:bg-rose-700'
-                    : 'bg-gradient-to-tr from-[#1D8DE6] to-[#35A6F7] text-white shadow-[#1D8DE6]/30 ring-4 ring-[#1D8DE6]/25 hover:scale-105'
-                }`}
-              >
-                {isThinking ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : isListening ? (
-                  <ArrowRight className="w-6 h-6 text-white stroke-[2.5]" />
-                ) : isSpeaking ? (
-                  <Square className="w-5 h-5 fill-current" />
-                ) : (
-                  <Mic className="w-6 h-6" />
-                )}
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={onSubmitTranscript || onToggleMic}
+                  disabled={micDisabled || isThinking}
+                  className="px-5 py-2.5 rounded-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-xs font-['Sora'] shadow-lg shadow-emerald-600/35 ring-4 ring-emerald-200 transition-all cursor-pointer touch-manipulation animate-pulse"
+                  title="Send recorded speech immediately"
+                  aria-label="Send recorded speech"
+                >
+                  <span>Send Voice</span>
+                  <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                </button>
+              </div>
+            ) : (
+              /* Idle / Start State: big inviting mic button */
+              <div className="flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={onToggleMic}
+                  disabled={micDisabled || isThinking}
+                  aria-label={!hasStarted ? 'Tap to speak' : 'Start speaking'}
+                  className={`px-6 py-2.5 rounded-full flex items-center justify-center gap-2 text-white font-semibold text-xs font-['Sora'] shadow-lg transition-all duration-200 cursor-pointer active:scale-95 focus:outline-none focus:ring-4 touch-manipulation ${
+                    !hasStarted
+                      ? 'bg-gradient-to-tr from-[#111A3A] via-[#1D8DE6] to-[#35A6F7] shadow-[#1D8DE6]/35 ring-4 ring-[#1D8DE6]/30 hover:scale-105 animate-pulse'
+                      : 'bg-gradient-to-tr from-[#1D8DE6] to-[#35A6F7] shadow-[#1D8DE6]/30 ring-4 ring-[#1D8DE6]/25 hover:scale-105'
+                  }`}
+                >
+                  {isThinking ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Thinking...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-4 h-4" />
+                      <span>{!hasStarted ? 'Tap to Talk with OneBot' : 'Tap to Speak'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Clear Mobile Status & Action Instruction */}
             <div className="text-center">
-              <span className="text-[10px] font-semibold text-[#111A3A] font-['Sora'] tracking-tight block">
+              <span className="text-[10px] font-semibold text-[#111A3A]/80 font-['Sora'] tracking-tight block">
                 {!hasStarted && voiceState === 'idle'
-                  ? 'Tap to Speak'
+                  ? 'Tap OneBot or button above to start'
                   : isListening
-                  ? 'Tap Send (or Stop to cancel)'
+                  ? 'Tap Send Voice or pause when finished'
                   : isSpeaking
-                  ? 'Stop Speaking'
+                  ? 'Tap Stop Speaking or tap OneBot to interrupt'
                   : isThinking
-                  ? 'Thinking...'
-                  : 'Tap to Speak'}
+                  ? 'Consulting VisionONE intelligence...'
+                  : 'Tap to Speak anytime'}
               </span>
             </div>
           </div>

@@ -630,18 +630,36 @@ export default function App() {
         <div className="pointer-events-auto flex items-end justify-end animate-in fade-in zoom-in-95 duration-200 select-none">
           <button
             onClick={handleOpenAssistant}
-            className="group flex items-center gap-2 px-3.5 py-2 rounded-full glass-dark-capsule text-white shadow-xl hover:shadow-[#1D8DE6]/35 hover:scale-102 active:scale-98 transition-all cursor-pointer border border-white/25"
+            className="group flex items-center gap-2.5 px-3.5 py-2 rounded-full glass-dark-capsule text-white shadow-xl hover:shadow-[#1D8DE6]/35 hover:scale-102 active:scale-98 transition-all cursor-pointer border border-white/25 touch-manipulation"
             aria-label="Open VisionONE Voice Assistant"
           >
-            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#1D8DE6] to-[#35A6F7] flex items-center justify-center shrink-0 shadow-xs">
-              <Mic className="w-3.5 h-3.5 text-white animate-pulse" />
+            {/* Animated Mini OneBot Avatar */}
+            <div className="relative w-8 h-8 rounded-full bg-gradient-to-tr from-[#1E2C58] to-[#111A3A] p-0.5 border border-[#35A6F7]/60 flex items-center justify-center shrink-0 shadow-md">
+              <svg viewBox="0 0 40 40" className="w-6 h-6 overflow-visible" fill="none">
+                {/* Antenna */}
+                <rect x="18.5" y="4" width="3" height="5" rx="1.5" fill="#35A6F7" />
+                <circle cx="20" cy="4" r="2.5" fill="#52BAFF" className="animate-pulse" />
+                {/* Head */}
+                <rect x="7" y="9" width="26" height="22" rx="9" fill="#162248" stroke="#35A6F7" strokeWidth="1.2" />
+                {/* Visor */}
+                <rect x="10" y="13" width="20" height="14" rx="5" fill="#0A1024" stroke="#1D8DE6" strokeWidth="0.8" />
+                {/* Glowing Eyes */}
+                <circle cx="16" cy="20" r="2.2" fill="#52BAFF" />
+                <circle cx="24" cy="20" r="2.2" fill="#52BAFF" />
+                {/* Friendly Smile */}
+                <path d="M 18 24 Q 20 25.5 22 24" stroke="#52BAFF" strokeWidth="1" strokeLinecap="round" />
+              </svg>
+              {/* Online pulse indicator */}
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#111A3A] flex items-center justify-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping opacity-75" />
+              </span>
             </div>
             <div className="text-left pr-1">
               <span className="block text-xs font-bold font-['Sora'] leading-tight whitespace-nowrap text-white">
                 VisionONE Voice AI
               </span>
               <span className="block text-[9px] text-[#E5F0FE]/85 font-['Inter'] whitespace-nowrap">
-                Click to speak hands-free
+                Talk with OneBot hands-free
               </span>
             </div>
           </button>
