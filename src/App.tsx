@@ -24,8 +24,8 @@ const INITIAL_WELCOME_MESSAGE: ChatMessage = {
 };
 
 export default function App() {
-  // Widget states: Starts CLOSED and not dismissed
-  const [isOpen, setIsOpen] = useState<boolean>(false);
+  // Widget states: Starts OPEN on launch for immediate mobile-first engagement
+  const [isOpen, setIsOpen] = useState<boolean>(true);
   const [isDismissed, setIsDismissed] = useState<boolean>(false);
   const [hasStarted, setHasStarted] = useState<boolean>(false);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
@@ -63,6 +63,7 @@ export default function App() {
   const isConversationOverRef = useRef<boolean>(false);
   isConversationOverRef.current = isConversationOver;
   const processUserMessageRef = useRef<(text: string) => void>(() => {});
+  const mountTimeRef = useRef<number>(Date.now());
 
   // Safe microphone speech recognition starter for continuous hands-free conversation
   const startListening = useCallback(async () => {
@@ -390,17 +391,9 @@ export default function App() {
 
       const spoken = data.voiceText || data.text;
 
-      if (shouldClose) {
-        // User asked to close by voice: speak the brief goodbye, then close widget completely!
-        speakVoice(spoken, false, data.audioUrl, () => {
-          setTimeout(() => {
-            handleDismissCompletely();
-          }, 400);
-        });
-      } else {
-        // Continue hands-free conversation if not over!
-        speakVoice(spoken, !isOver, data.audioUrl);
-      }
+      // Never auto-dismiss or unmount the widget from voice turn-taking.
+      // If conversation is marked complete, speak farewell and leave "Start New Conversation" controls ready.
+      speakVoice(spoken, !isOver, data.audioUrl);
     } catch (err) {
       console.warn('Chat request fallback notice:', err);
       setVoiceState('idle');
@@ -510,7 +503,7 @@ export default function App() {
   };
 
   // Triggered when user CLICKS the widget button: Opens widget and introduces himself IMMEDIATELY!
-  const handleOpenAssistant = () => {
+  const handleOpenAssistant = useCallback(() => {
     setIsDismissed(false);
     setIsOpen(true);
     setIsAutoListening(true);
@@ -521,7 +514,8 @@ export default function App() {
       speechSynthesisRef.current.resume();
     }
 
-    // Prime microphone permission during this direct user tap/click gesture
+    // Crucial: pause mic capture while the assistant is greeting so the mic does not hear itself
+    speechRecognitionRef.current?.pauseListeningForAgentTurn();
     speechRecognitionRef.current?.primePermission();
 
     // Synchronous execution within the user's click handler guarantees zero-latency instant speech
@@ -552,7 +546,7 @@ export default function App() {
         setVoiceState('idle');
       },
     });
-  };
+  }, [startListening]);
 
   const handleLeadSubmit = async (leadData: LeadFormData): Promise<boolean> => {
     try {
@@ -602,16 +596,31 @@ export default function App() {
     }
   }, [isOpen, isDismissed]);
 
+  // Check if running embedded inside an iframe (e.g. WordPress HFCM)
+  const isEmbedded = typeof window !== 'undefined' && window.parent && window.parent !== window;
+
   // Listen for parent messages from WordPress site
   useEffect(() => {
     const handleParentMsg = (event: MessageEvent) => {
       if (!event.data || typeof event.data !== 'object') return;
-      if (event.data.action === 'OPEN_VISIONONE_WIDGET') {
+
+      // Only handle actions specifically directed to VisionONE
+      const action = event.data.action;
+      if (!action) return;
+
+      if (action === 'OPEN_VISIONONE_WIDGET') {
         handleOpenAssistant();
-      } else if (event.data.action === 'CLOSE_COMPLETELY') {
-        handleDismissCompletely();
-      } else if (event.data.action === 'CLOSE_VISIONONE_WIDGET') {
-        handleMinimizeAssistant();
+      } else if (action === 'CLOSE_COMPLETELY' || action === 'CLOSE_VISIONONE_WIDGET') {
+        // Guard against any premature unsolicited close messages on initial launch
+        if (Date.now() - mountTimeRef.current < 15000) {
+          console.log('[VisionONE] Ignored close signal during launch stabilization period');
+          return;
+        }
+        if (action === 'CLOSE_COMPLETELY') {
+          handleDismissCompletely();
+        } else {
+          handleMinimizeAssistant();
+        }
       }
     };
     window.addEventListener('message', handleParentMsg);
@@ -620,10 +629,10 @@ export default function App() {
 
   return (
     <div
-      className={`fixed inset-0 flex flex-col justify-end items-end p-2 overflow-hidden font-['Inter'] transition-colors duration-200 ${
+      className={`fixed inset-0 flex flex-col justify-center sm:justify-end items-center sm:items-end p-2 sm:p-3 overflow-hidden font-['Inter'] transition-colors duration-200 ${
         isOpen ? 'pointer-events-auto' : 'pointer-events-none'
-      }`}
-      style={{ background: 'transparent' }}
+      } ${!isEmbedded ? 'bg-gradient-to-br from-[#070C1E] via-[#0F172A] to-[#1E293B]' : 'bg-transparent'}`}
+      style={{ background: isEmbedded ? 'transparent' : undefined }}
     >
       {/* Launcher State (Floating Capsule) */}
       {!isOpen && (
@@ -668,7 +677,7 @@ export default function App() {
 
       {/* Main Assistant Window when Open */}
       {isOpen && (
-        <main className="relative z-10 w-full max-w-[390px] h-[min(620px,calc(100dvh-16px))] flex flex-col justify-center items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200 mb-[env(safe-area-inset-bottom,0px)]">
+        <main className="relative z-10 w-full max-w-[400px] h-[min(640px,calc(100dvh-12px))] flex flex-col justify-center items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200 mb-[env(safe-area-inset-bottom,0px)]">
           <AssistantPanel
             voiceState={voiceState}
             messages={messages}

@@ -427,6 +427,12 @@ export class SpeechRecognitionManager {
       rec.onend = () => {
         if (this.lastTranscript.trim() && !this.isSubmitted && !this.isSpeakingOrThinking) {
           this.submitNow();
+        } else if (this.shouldBeListening && !this.isSpeakingOrThinking && !this.isSubmitted) {
+          // On mobile WebKit / Android WebKit, WebSpeech stops after brief silence.
+          // Keep recognition alive while listening mode is active so turn is never dropped.
+          try {
+            rec.start();
+          } catch {}
         }
       };
 
@@ -492,6 +498,13 @@ export class SpeechRecognitionManager {
       return true;
     }
 
+    // Require active human speech detection before submitting audio to avoid phantom silence submissions
+    if (!this.speechDetected) {
+      this.isSubmitted = false;
+      this.resumeListeningAfterAgentTurn();
+      return false;
+    }
+
     // 2. Otherwise (e.g. on iOS Safari / mobile browsers), flush & stop MediaRecorder and transcribe with Gemini!
     try {
       if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
@@ -513,6 +526,7 @@ export class SpeechRecognitionManager {
       this.pauseListeningForAgentTurn();
 
       if (this.audioChunks.length === 0) {
+        this.isSubmitted = false;
         this.resumeListeningAfterAgentTurn();
         return false;
       }
@@ -521,8 +535,9 @@ export class SpeechRecognitionManager {
       const audioBlob = new Blob(this.audioChunks, { type: effectiveMime });
       this.audioChunks = [];
 
-      // Accept any recorded speech chunk (> 150 bytes)
-      if (audioBlob.size < 150) {
+      // Accept recorded speech chunks with sufficient size (> 500 bytes) indicating real speech
+      if (audioBlob.size < 500) {
+        this.isSubmitted = false;
         this.resumeListeningAfterAgentTurn();
         return false;
       }

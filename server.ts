@@ -1026,13 +1026,13 @@ app.get("/embed.js", (req, res) => {
     if (open) {
       if (isMobile) {
         container.style.width = "calc(100vw - 16px)";
-        container.style.height = "min(620px, calc(100dvh - 16px))";
+        container.style.height = "min(640px, calc(100dvh - 16px))";
         container.style.bottom = "8px";
         container.style.right = "8px";
         container.style.left = "8px";
       } else {
-        container.style.width = "390px";
-        container.style.height = "620px";
+        container.style.width = "400px";
+        container.style.height = "640px";
         container.style.bottom = "20px";
         container.style.right = "20px";
         container.style.left = "auto";
